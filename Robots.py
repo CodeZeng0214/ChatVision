@@ -7,7 +7,7 @@
 #@ 一句话多任务支持
 
 from openai import OpenAI
-from MyAuxiliaryFunction import ExtractStrBetween
+from AuxiliaryFunction import ExtractStrBetween
 from ultralytics import YOLO
 
 BASE_URL = "https://api.chatanywhere.tech/v1" # 默认语义大模型网站
@@ -65,7 +65,7 @@ class ChatGPTCase():
 class ChatRobot():
     """聊天机器人"""
     
-    def __init__(self, init_role="assistant", init_message="You are an image recognition assistant.", init_case=ChatGPTCase()):
+    def __init__(self, init_role="assistant", init_message="你是一个能够进行图像识别的聊天机器人.", init_case=ChatGPTCase()):
         """
         init_role="user" 初始化要求该机器人扮演的角色 默认值 "image recognition assistant."\n
         init_message 初始化信息，告诉ChatRobot扮演的角色 默认值 "You are an image recognition assistant."\n
@@ -92,11 +92,15 @@ class ChatRobot():
             self.MessagesAdd(self.case.GPTStream(self.messages))
             return
         
-        # 获取任务识别的信息结果
-        recognition_information = self.CallIRBot(extracted_informations)
-        
+        # 获取任务识别的信息结果 （兼容多目标识别）
+        recognition_informations = self.CallIRBot(extracted_informations)
+        id = 1
+        org_information = ''
+        for recognition_information in recognition_informations:
+            org_information += f'第{id}张图片的识别结果是：\n{recognition_information}\n'
+            id += 1
         # 让GPT根据任务的结果回答用户的问题
-        GPT_response = self.case.GPTStream([{'role': 'user', 'content': (recognition_information+self.HintTemplates('YOLO')+question)}])
+        GPT_response = self.case.GPTStream([{'role': 'user', 'content': (org_information+self.HintTemplates('IA')+question)}])
         self.MessagesAdd(GPT_response)
     
     # 将信息添加到当前聊天机器人
@@ -112,8 +116,8 @@ class ChatRobot():
         """
         为输入的信息添加提示信息的模板内容\n
         用于与GPT聊天的过程中
-        option = 'IE'   用户输入信息提取模板\n
-        option = 'YOLO' YOLO信息整理模板
+        option = 'IE'   用户输入信息提取模板 information extract \n
+        option = 'IA' YOLO信息整理模板 information arrangement
         """
         if option == 'Init':
              template = '你是一个能够进行图像识别的聊天机器人'
@@ -122,6 +126,7 @@ class ChatRobot():
                             可能提取到的信息以及返回的信息格式如下：\n\
                             1.图片或视频路径：例如brid.png、bus.jpg等常见图片或视频格式文件,\
                                 返回格式：一个计算机能够读取的路径，请在返回的路径前加上字符串'@OBJ'，在路径末尾加上字符串'&OBJ'\n\
+                                    如果用户输入的是文件夹路径，也在返回的路径前加上字符串'@OBJ'，在路径末尾加上字符串'&OBJ'\n\
                                     如果用户输入的内容不包含图片或视频路径，请返回一个字符串'%General%'\n\
                             2.想采用的权重路径：例如yolov8n.pt格式的文件,\n\
                                 返回格式：一个计算机能够读取的路径，请在返回的路径前加上字符串'@WEI'，在路径末尾加上字符串'&WEI'\n\
@@ -129,11 +134,13 @@ class ChatRobot():
                             3.任务的种类：请理解用户的意图是以下这些种类哪一个,\n\
                                 可能属于的种类：图像物体检测，图像物体数数，图像描述.\n\
                                 返回格式：如果是 检测图像物体 类任务，请返回字符串'#IOD&TASK',\n\
-                                        如果是 数图像物体个数 类任务，请返回字符串'#IOC&TASK',\n\
+                                        \n\
+                                            \n\
                             以下是用户输入的信息，请你按照以上规则和要求返回信息，'\
                                 返回的字符串间请换行：\n"
-        elif option == 'YOLO':
-            template = '\n以上的内容是我利用YOLO识别用户输入的图像的返回信息，请你根据这些信息回答用户的如下问题,注意不需要完全利用YOLO的返回信息：\n'
+                                # 如果是 数图像物体个数 类任务，请返回字符串'#IOC&TASK',
+        elif option == 'IA':
+            template = '\n以上的内容是利用图像识别模型识别用户输入的目标的返回信息，请你根据这些信息回答用户的如下问题,注意不需要完全利用以上内容，且将对象名称翻译为中文，针对性的回复用户提出的问题即可：\n'
         else:
             print("错误不存在该模板,返回空值")
             template = ''
@@ -169,9 +176,9 @@ class ChatRobot():
     # 调用 图像识别机器人 完成任务
     def CallIRBot(self, extracted_informations=None):
         if extracted_informations is None: return
-        ir_robot = ImageRecognitionRobot()
-        recognition_information = ir_robot.RecognitionFrame(extracted_informations)
-        return recognition_information
+        ir_robot = ImgRecRobot()
+        recognition_informations = ir_robot.RecognitionFrame(extracted_informations)
+        return recognition_informations
           
     # 清空当前机器人消息记录
     def ResetMessages(self):
@@ -182,7 +189,7 @@ class ChatRobot():
         
 
 ## 图像识别机器人的类
-class ImageRecognitionRobot:
+class ImgRecRobot:
     def __init__(self):
         self.id = 1
     
@@ -201,21 +208,22 @@ class ImageRecognitionRobot:
         if task_type == 'IOD':
             if weight_path: weight = weight_path[0]
             else: weight = IOD_WEI_PATH
-            recognition_result = self.YOLOIOD(target_path, weight)
+            recognition_result = self.YOLODetect(target_path, weight)
         else: 
             recognition_result = "图像识别任务处理失败"
             print("图像识别任务处理失败")
         return recognition_result
         
     # 利用YOLO完成图像识别类任务
-    def YOLOIOD(self, target_path, weight=IOD_WEI_PATH,save=False):
+    def YOLODetect(self, target_path, weight=IOD_WEI_PATH,is_save=False, is_show=False):
         print("正在使用YOLO执行图像识别任务")
         model = YOLO(weight)
-        results = model.predict(source=target_path, save=save, show=True, save_txt=False,  verbose=False)
+        results = model.predict(source=target_path, save=is_save, save_txt=False,  verbose=False)
         print("检测完成")
-        recognition_result = ''
+        recognition_results = []
         for result in results:
             # result是一个检测结果对象，通常包含边界框、标签、置信度等信息
+            recognition_result = ''
             for detection in result.boxes:  # 访问每个检测的框
             # 提取边界框坐标、置信度和标签
                 x1, y1, x2, y2 = detection.xyxy[0]  # 左上角和右下角坐标
@@ -223,7 +231,21 @@ class ImageRecognitionRobot:
                 conf = 100*conf
                 cls = int(detection.cls[0])  # 类别索引
                 label = model.names[cls]  # 获取类别名称
-                recognition_result += f"在图像的 [{x1:.2f}, {y1:.2f}, {x2:.2f}, {y2:.2f}] 位置检测到有{conf:.2f}%置信度的 {label} 对象\n"
-        return recognition_result
+                recognition_result += f"检测到有{conf:.2f}%置信度的 {label} 对象\n"
+            if is_show: result.show()
+            recognition_results.append(recognition_result)
+        return recognition_results
 
+
+## 调试主程序
+if __name__ == '__main__':
+
+    chat_robot = ChatRobot()
     
+    print("开始对话（输入'退出'以结束）：")
+    while True:
+        user_input = input("你: ")
+        if user_input.lower() == '退出':
+            break
+        print("ChatYOLO:", end="")
+        chat_robot.ChatFrame(question=user_input)
