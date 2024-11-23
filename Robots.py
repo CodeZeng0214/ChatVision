@@ -9,6 +9,7 @@
 from openai import OpenAI
 from AuxiliaryFunction import ExtractStrBetween
 from ultralytics import YOLO
+from transformers import AutoProcessor, Blip2ForConditionalGeneration
 
 BASE_URL = "https://api.chatanywhere.tech/v1" # 默认语义大模型网站
 API_KEY = "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR" # 默认网站密钥
