@@ -3,15 +3,16 @@
 ## 此文件为最新的ChatYOLO详细实现，目前的状态是代码汇总至这一个文件
 
 from openai import OpenAI
-from ultralytics import YOLO
 from typing import Dict, Callable, Any
+from ultralytics import YOLO
 
 
 ### ========== 全局参数 ========== ###
 BASE_URL = "https://api.chatanywhere.tech/v1" # 默认语义大模型网站
 API_KEY = "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR" # 默认网站密钥
 GPT_MODEL = 'gpt-4o-mini' # 默认GPT模型
-DET_WEI_PATH = './/weights//YOLOv8//yolov8m.pt' # 默认的图像检测类任务的权重路径
+DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类任务的权重路径
+TRA_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的图像跟踪类任务的权重路径
 
 
 ### ========== ChatGPT聊天类 ========== ###
@@ -43,6 +44,7 @@ class ChatGPT():
         """为提供的对话消息创建新的回答(流式响应)\n
         messages (list): 完整的对话消息以增强上下文的记忆
         """
+        print(messages[0]['content'])
         stream = self.chatcase.chat.completions.create(
             model = self.model,
             messages = messages,
@@ -107,7 +109,7 @@ class TaskManager:
     
     
 ### ========== 可实现的任务列表 ========== ###
-# 图像识别
+# 图像物体识别（YOLO）
 def ObjDetect(params):
     """
     物体检测任务实现。\n
@@ -115,7 +117,7 @@ def ObjDetect(params):
     """
     image_path = params['image_path']
     weight_path = params.get('weight_path', DET_WEI_PATH)
-    is_show = params.get('is_show', False)
+    is_show = params.get('is_show', True)
 
     # 加载 YOLO 模型
     model = YOLO(weight_path)
@@ -137,6 +139,46 @@ def ObjDetect(params):
         if is_show: result.show()
         detection_results.append(detection_result)
     return detection_results
+
+
+# 图像物体跟踪（YOLO）
+def ObjTrack(params):
+    """
+    物体跟踪任务实现。\n
+    参数格式：{'image_path': str, 'weight_path': str (可选)}\n
+    """
+    image_path = params['image_path']
+    weight_path = params.get('weight_path', TRA_WEI_PATH)
+    is_show = params.get('is_show', True)
+    
+    model = YOLO(weight_path)
+    
+    results = model.track(source=image_path, show=is_show, stream=True)
+    if results : return("已经显示于屏幕上")
+    
+    
+
+#图像描述
+def ImgDescription(params):
+# pip install accelerate
+    import requests
+    from PIL import Image
+    from transformers import Blip2Processor, Blip2ForConditionalGeneration
+
+    processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+    # model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", device_map="auto")
+    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b")
+
+    img_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg' 
+    raw_image = Image.open(requests.get(img_url, stream=True).raw).convert('RGB')
+
+    question = "how many dogs are in the picture?"
+    inputs = processor(raw_image, question, return_tensors="pt").to("cuda")
+
+    out = model.generate(**inputs)
+    print(processor.decode(out[0], skip_special_tokens=True).strip())
+
+    return 1
     
 
 ### ========== 聊天机器人类 ========== ###
@@ -159,6 +201,13 @@ class ChatRobot:
             ObjDetect,
             "识别图像中的物体",
             [{"name": "image_path", "required": True}, 
+             {"name": "weight_path","required": False}]
+        )
+        self.task_manager.register_task(
+            "object_track", 
+            ObjTrack, 
+            "跟踪画面上的物体",
+             [{"name": "image_path", "required": True}, 
              {"name": "weight_path","required": False}]
         )
 
@@ -191,7 +240,7 @@ class ChatRobot:
         # 用 GPT 根据结果生成自然语言回复
         result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
         response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                        + "请你根据用户的问题内容，提取以上任务执行的结果信息来回答用户的问题：" 
+                                        + "\n请你根据用户的问题内容，提取以上任务执行的结果信息来回答用户的问题：\n" 
                                         + question}])
         self.messages.append({"role": "assistant", "content": response})
         return response
@@ -226,7 +275,7 @@ if __name__ == '__main__':
     print("开始对话（输入'退出'或'q'以结束）：")
     while True:
         user_input = input("你: ")
-        if user_input.lower() == '退出' or 'q':
+        if user_input.lower() == 'q':
             break
         #print("ChatYOLO:")
         chat_robot.ChatFrame(question=user_input)
