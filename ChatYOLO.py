@@ -71,11 +71,11 @@ class TaskManager:
     def register_task(self, task_name: str, task_callable: Callable, description: str, parameters: list):
         """
         注册任务。\n
-        - task_name: 任务名称\n
-        - task_callable: 任务的实现方法\n
+        - task_name: 任务名称(交给语言模型读取的)\n
+        - task_callable: 任务的实现方法（调用哪个函数）\n
         - description: 任务描述\n
         - parameters: 参数需求列表，格式如下：\n
-          [{"name": "image_path", "required": True}, {"name": "weight_path", "required": False}]\n
+          [{"name": "image_path", "description": "建议英文", required": True}]\n
           其中required代表是否必需，不必须通常是指存在默认路径
         """
         self.tasks[task_name] = {
@@ -91,14 +91,15 @@ class TaskManager:
             parameter_strings = []
             for parameter in task["parameters"]:
                 if parameter["required"]:
-                    parameter_strings.append(f"{parameter['name']} (necessary)")
+                    parameter_strings.append(f"{parameter['name']} (necessary): {parameter['description']}")
                 else:
-                    parameter_strings.append(f"{parameter['name']} (unnecessary)")
+                    parameter_strings.append(f"{parameter['name']} (unnecessary): {parameter['description']}")
 
-            parameter_description = ', '.join(parameter_strings)
+            parameter_description = '\n'.join(parameter_strings)
 
-            description = f"-- {name}: {task['description']}, 参数: {parameter_description}"
+            description = f"-- {name}: {task['description']},\nparameters: \n{parameter_description}"
             descriptions.append(description)
+            # print("以下是支持的任务名称及所需参数:\n" + "\n".join(descriptions))
         return "以下是支持的任务名称及所需参数:\n" + "\n".join(descriptions)
         
     # 获取任务并实现
@@ -113,11 +114,11 @@ class TaskManager:
 def ObjDetect(params):
     """
     物体检测任务实现。\n
-    参数格式：{'image_path': str, 'weight_path': str (可选)}\n
+    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
     image_path = params['image_path']
     weight_path = params.get('weight_path', DET_WEI_PATH)
-    is_show = params.get('is_show', True)
+    is_show = params.get('is_show', False)
 
     # 加载 YOLO 模型
     model = YOLO(weight_path)
@@ -141,15 +142,15 @@ def ObjDetect(params):
     return detection_results
 
 
-# 图像物体跟踪（YOLO）
-def ObjTrack(params):
+# 人体姿态跟踪（YOLO）
+def HummanPoseTrack(params):
     """
-    物体跟踪任务实现。\n
-    参数格式：{'image_path': str, 'weight_path': str (可选)}\n
+    人体姿态跟踪任务实现。\n
+    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
     image_path = params['image_path']
     weight_path = params.get('weight_path', TRA_WEI_PATH)
-    is_show = params.get('is_show', True)
+    is_show = params.get('is_show', False)
     
     model = YOLO(weight_path)
     
@@ -197,18 +198,20 @@ class ChatRobot:
     def _RegisterTasks(self):
         """注册任务"""
         self.task_manager.register_task(
-            "object_detection",
+            "ObjectDetect",
             ObjDetect,
-            "识别图像中的物体",
-            [{"name": "image_path", "required": True}, 
-             {"name": "weight_path","required": False}]
+            "Detect objects in the image",
+             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
+             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False},
+             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return True or False", "required": False}]
         )
         self.task_manager.register_task(
-            "object_track", 
-            ObjTrack, 
-            "跟踪画面上的物体",
-             [{"name": "image_path", "required": True}, 
-             {"name": "weight_path","required": False}]
+            "HumanPoseTrack", 
+            HummanPoseTrack, 
+            "Track and estimate human posture",
+             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
+             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False}, 
+             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return True or False", "required": False}]
         )
 
     # 主框架
@@ -257,7 +260,7 @@ class ChatRobot:
             "task_type": <任务类型>,
             "parameters": <参数字典>
         }}
-        注意事项：若参数后缀为unrequired，且用户没有输入有关该参数的信息，则不必写入返回内容，
+        注意事项：1.若参数后缀为unnecessary，且用户没有输入有关该参数的信息，则不必写入返回内容，
         用户输入如下：
         {user_input}
         """
