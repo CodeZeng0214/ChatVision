@@ -4,3 +4,9 @@
 /归档/过去的runs
 /归档/过去的results
 /归档/CopilotCode问答
+/modules/YOLODeepsort/.idea
+/modules/YOLODeepsort/__pycache__
+/modules/YOLODeepsort/deep_sort/deep_sort/__pycache__
+/modules/YOLODeepsort/deep_sort/deep_sort/deep/__pycache__
+/modules/YOLODeepsort/deep_sort/deep_sort/sort/__pycache__
+/modules/YOLODeepsort/deep_sort/utils/__pycache__
