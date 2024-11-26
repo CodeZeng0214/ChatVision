@@ -2,7 +2,7 @@ import torch
 from ultralytics import YOLO
 
 OBJ_LIST = ['person', 'car', 'bus', 'truck']
-DETECTOR_PATH = 'weights/yolov8s.pt'
+DETECTOR_PATH = './weights/YOLOv8\yolov8x_UAV.pt'
 
 class baseDet(object):
     def __init__(self):
@@ -34,7 +34,7 @@ class Detector(baseDet):
 
     def detect(self, im):
         res = self.model.predict(im, imgsz=self.img_size, conf=self.conf,
-                                     iou=self.iou, device=self.device, verbose=False)
+                                     iou=self.iou, device=self.device, verbose=False, line_width=2)
                     
         detected_boxes = res[0].boxes
         pred_boxes = []

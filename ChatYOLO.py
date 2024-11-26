@@ -1,200 +1,21 @@
+### 大修改
 ### 2024.11.18 创建主函数，调用其他模块完成对话
-### 2024.11.23 基于CodeCopilot进行代码重构
-## 此文件为最新的ChatYOLO详细实现，目前的状态是代码汇总至这一个文件
+### 2024.11.23 基于CodeCopilot进行代码重构，代码汇总至这一个文件
+### 2024.11.26 代码框架分散化，提高可维护性
 
 #@ 待解决的问题： 如何确保一个新加的模块的库的安装准确
 #@ 待解决的问题： 如何让ChatGPT记忆上次任务的结果并认为是自己完成了任务
 
-from openai import OpenAI
-from typing import Dict, Callable, Any
-from ultralytics import YOLO
+
+### ========== 导入辅助模块 ========== ###
+from ChatInter import ChatGPT # 导入ChatGPT聊天接口
+from TasksManager import TasksManager # 导入任务管理器
+
+### ========== 导入任务模块 ========== ###
+from modules.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
 from modules.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
-
-
-### ========== 全局参数 ========== ###
-BASE_URL = "https://api.chatanywhere.tech/v1" # 默认语义大模型网站
-API_KEY = "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR" # 默认网站密钥
-GPT_MODEL = 'gpt-4o-mini' # 默认GPT模型
-DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类任务的权重路径
-POSE_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的人体姿态估计类任务的权重路径
-BLIP_PATH = './weights/blip-image-captioning-large' # BLIP 推理模型
-
-
-### ========== ChatGPT聊天类 ========== ###
-class ChatGPT():
-    """
-    实例化一个GPT聊天\n
-    api_key 密钥设置 默认值 "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR"\n
-    base_url 网址设置 默认值 "https://api.chatanywhere.tech/v1"\n
-    gpt_model GPT选用的模型 默认值 'gpt-4o-mini'
-    """
-    def __init__(self, api_key=API_KEY, base_url=BASE_URL, gpt_model=GPT_MODEL):
-        self.api_key = api_key # 密钥
-        self.base_url = base_url # 网址
-        self.model = gpt_model # 选用的模型
-        self.chatcase = OpenAI(api_key=self.api_key, base_url=self.base_url) # 创建的聊天接口
-        
-    # 非流式响应
-    def UnstreamResponse(self, messages: list):
-        """为提供的对话消息创建新的回答(非流式响应)\n
-        messages (list): 完整的对话消息以增强上下文的记忆
-        """
-        completion = self.chatcase.chat.completions.create(model=self.model, messages=messages)
-        response = completion.choices[0].message.content
-        #print(response_unstream)
-        return response
+from modules.BLIPTasks import ImgDescription
     
-    # 流式响应
-    def StreamResponse(self, messages: list):
-        """为提供的对话消息创建新的回答(流式响应)\n
-        messages (list): 完整的对话消息以增强上下文的记忆
-        """
-        # print(messages[0]['content']) 测试输入给ChatGPT的信息
-        stream = self.chatcase.chat.completions.create(
-            model = self.model,
-            messages = messages,
-            stream = True,
-        )
-        response = ""
-        for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
-                response += chunk.choices[0].delta.content
-                print(chunk.choices[0].delta.content, end = "")
-        print("")
-        return response
-    
-
-### ========== 任务注册与管理 ========== ###
-class TaskManager:
-    """
-    任务注册管理器：支持动态注册与调用任务。
-    """
-    def __init__(self):
-        self.tasks = {}
-
-    # 注册任务
-    def register_task(self, task_name: str, task_callable: Callable, description: str, parameters: list):
-        """
-        注册任务。\n
-        - task_name: 任务名称(交给语言模型读取的)\n
-        - task_callable: 任务的实现方法（调用哪个函数）\n
-        - description: 任务描述\n
-        - parameters: 参数需求列表，格式如下：\n
-          [{"name": "image_path", "description": "建议英文", required": True}]\n
-          其中required代表是否必需，不必须通常是指存在默认路径
-        """
-        self.tasks[task_name] = {
-            "callable": task_callable,
-            "description": description,
-            "parameters": parameters,
-        }
-    
-    # 为注册的任务生成描述
-    def DescribeTasks(self) -> str:
-        descriptions = []
-        for name, task in self.tasks.items():
-            parameter_strings = []
-            for parameter in task["parameters"]:
-                if parameter["required"]:
-                    parameter_strings.append(f"{parameter['name']} (necessary): {parameter['description']}")
-                else:
-                    parameter_strings.append(f"{parameter['name']} (unnecessary): {parameter['description']}")
-
-            parameter_description = '\n'.join(parameter_strings)
-
-            description = f"-- {name}: {task['description']},\nparameters: \n{parameter_description}"
-            descriptions.append(description)
-        # print("The following are the supported task names and required parameters:\n" + "\n".join(descriptions))
-        return "The following are the supported task names and required parameters:\n" + "\n".join(descriptions)
-        
-    # 获取任务并实现
-    def GetTask(self, task_name):
-        """获取任务实现"""
-        return self.tasks.get(task_name)
-    
-    
-    
-### ========== 可实现的任务列表 ========== ###
-# 图像物体识别（YOLO）
-def ObjDetect(params):
-    """
-    物体检测任务实现。\n
-    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
-    """
-    image_path = params['image_path']
-    weight_path = params.get('weight_path', DET_WEI_PATH)
-    is_show = params.get('is_show', False)
-
-    # 加载 YOLO 模型
-    model = YOLO(weight_path)
-    results = model.predict(source=image_path, save=False, verbose=False)
-
-    # 格式化结果
-    detection_results = []
-    for result in results:
-        # result是一个检测结果对象，通常包含边界框、标签、置信度等信息
-        detection_result = ''
-        for box in result.boxes:  # 访问每个检测的框
-        # 提取边界框坐标、置信度和标签
-            x1, y1, x2, y2 = box.xyxy[0]  # 左上角和右下角坐标
-            conf = box.conf[0]  # 置信度
-            conf = 100*conf
-            cls = int(box.cls[0])  # 类别索引
-            label = model.names[cls]  # 获取类别名称
-            detection_result += f"检测到有一个{conf:.2f}%置信度的 {label} 对象\n"
-        if is_show: result.show()
-        detection_results.append(detection_result)
-    return detection_results
-
-
-# 人体姿态跟踪（YOLO）
-def HummanPoseTrack(params):
-    """
-    人体姿态跟踪任务实现。\n
-    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
-    """
-    image_path = params['image_path']
-    weight_path = params.get('weight_path', POSE_WEI_PATH)
-    is_show = params.get('is_show', False)
-    
-    model = YOLO(weight_path)
-    
-    results = model.track(source=image_path, show=is_show, stream=True)
-    if results : return("已经显示于屏幕上")
-    
-
-#图像描述
-def ImgDescription(params):
-# pip install accelerate
-    import time
-    import requests
-    from PIL import Image
-    from transformers import BlipProcessor, BlipForConditionalGeneration
-    blip_path = params.get('weight_path', BLIP_PATH)
-    image_path = params['image_path']
-
-    start_time = time.time()
-
-    # 本地模型
-    processor = BlipProcessor.from_pretrained(
-        blip_path, local_files_only=True)
-    model = BlipForConditionalGeneration.from_pretrained(
-        blip_path, local_files_only=True)
-
-    raw_image = Image.open(image_path).convert('RGB')
-
-    # conditional image captioning
-    text = "This picture show"
-    inputs = processor(raw_image, text, return_tensors="pt")
-
-    out = model.generate(**inputs, max_new_tokens=50)
-    task_result = processor.decode(out[0], skip_special_tokens=True)
-    print(task_result)
-
-    spend_time = start_time-time.time()
-    print(f'spend time: {spend_time}')
-
-    return task_result
     
 
 ### ========== 聊天机器人类 ========== ###
@@ -205,9 +26,9 @@ class ChatRobot:
         -chat_inter 与语言模型通讯的聊天接口，默认为ChatGPT
         init_message 初始化内容，默认"你是一个能够进行图像识别的聊天机器人."
         """
-        self.chat_inter = ChatGPT()
+        self.chat_inter = chat_inter
         self.messages = [{"role": "system", "content": init_message}]
-        self.task_manager = TaskManager() # 实例化一个任务管理器
+        self.task_manager = TasksManager() # 实例化一个任务管理器
         self._RegisterTasks()
 
     def _RegisterTasks(self):
@@ -218,7 +39,7 @@ class ChatRobot:
             "Detect objects or humans in the image, can count",
              [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
              {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False},
-             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return True or False", "required": False}]
+             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return a boolean value without quotation marks: True or False(capitalize the first letter)", "required": False}]
         )
         self.task_manager.register_task(
             "HumanPoseEstimate", 
@@ -226,12 +47,20 @@ class ChatRobot:
             "Can only estimate human posture, not count",
              [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
              {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False}, 
-             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return True or False", "required": False}]
+             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return a boolean value without quotation marks: True or False(capitalize the first letter)", "required": False}]
         )
         self.task_manager.register_task(
-            "Pedestrian and vehicle tracking", 
+            "Pedestrian and Vehicle tracking", 
             PedCarTrack, 
             "Track pedestrians and vehicles",
+             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
+             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False},
+            {"name": "save_path", "description": "Storage path of the task result file", "required": False}]
+        )
+        self.task_manager.register_task(
+            "Image Description", 
+            ImgDescription, 
+            "Can describe the image in one sentence",
              [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
              {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False}]
         )
@@ -265,7 +94,7 @@ class ChatRobot:
         # 用 GPT 根据结果生成自然语言回复
         result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
         response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                        + "\n请你根据用户的问题内容，提取以上任务执行的结果信息来回答用户的问题：\n" 
+                                        + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
                                         + question}])
         self.messages.append({"role": "assistant", "content": response})
         return response
@@ -281,21 +110,20 @@ class ChatRobot:
         {task_descriptions}
         Only Return format:
         {{
-            "task_type": <任务类型>,
-            "parameters": <参数字典>
+            "task_type": <task type>,
+            "parameters": <parameter dictionary>
         }}
         Precautions: 1. If the suffix unnecessary for a parameter is unnecessary and no information about the parameter is entered, it is unnecessary to write the returned content. 
         User input is as follows:
         {user_input}
         """
-        messages = [{"role": "system", "content": "你是一个任务信息提取助手。"},
+        messages = [{"role": "system", "content": "You're a task extraction assistant."},
                     {"role": "user", "content": template}]
         task_info = self.chat_inter.UnstreamResponse(messages)
         print(task_info)
         return eval(task_info)  # 假设 GPT 返回 Python 字典格式
 
     
-
 if __name__ == '__main__':
 
     chat_robot = ChatRobot()
@@ -303,7 +131,7 @@ if __name__ == '__main__':
     print("开始对话（输入'退出'或'q'以结束）：")
     while True:
         user_input = input("你: ")
-        if user_input.lower() == 'q':
+        if user_input.lower() == '退出' or user_input.lower() == 'q':
             break
         print("ChatYOLO:", end='')
         chat_robot.ChatFrame(question=user_input)

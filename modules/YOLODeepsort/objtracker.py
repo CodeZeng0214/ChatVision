@@ -19,7 +19,7 @@ deepsort = DeepSort(os.path.join(current_dir, cfg.DEEPSORT.REID_CKPT),
 def plot_bboxes(image, bboxes, line_thickness=None):
     # Plots one bounding box on image img
     tl = line_thickness or round(
-        0.002 * (image.shape[0] + image.shape[1]) / 2) + 1  # line/font thickness
+        0.001 * (image.shape[0] + image.shape[1]) / 2) + 1  # line/font thickness
     list_pts = []
     point_radius = 4
     

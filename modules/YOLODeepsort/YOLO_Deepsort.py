@@ -12,8 +12,8 @@ from objdetector import Detector
 import cv2
 
 
-RESULT_PATH = './results/result.mp4'
-TRA_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像跟踪类任务的权重路径
+RESULT_PATH = './results\\Track_results\\result.mp4'
+TRA_WEI_PATH = './weights/YOLOv8\yolov8x_UAV.pt' # 默认的图像跟踪类任务的权重路径
 
 class Point:
     def __init__(self, x, y):
@@ -32,19 +32,21 @@ def draw_trail(output_image_frame, trail_points, trail_color, trail_length=50):
         if len(trail_points[i]) > 1:
             for j in range(1, len(trail_points[i])):
                 cv2.line(output_image_frame, (int(trail_points[i][j-1][0]), int(trail_points[i][j-1][1])),
-                         (int(trail_points[i][j][0]), int(trail_points[i][j][1])), trail_color[i], thickness=3)
+                         (int(trail_points[i][j][0]), int(trail_points[i][j][1])), trail_color[i], thickness=2)
         if len(trail_points[i]) > trail_length:
             trail_points[i].pop(0)  # Remove the oldest point from the trail
 
 def PedCarTrack(params):
     """
     行人车辆的跟踪任务实现。\n
-    参数：{'image_path': str, 'weight_path': str (可选)}\n
+    参数：{'image_path': str, 'weight_path': str (可选), 'save_path': str (可选)}\n
     """
     image_path = params['image_path']
     weight_path = params.get('weight_path', TRA_WEI_PATH)
-    is_show = params.get('is_show', False)
+    save_path = params.get('save_path', RESULT_PATH)
+    
     video_capture = cv2.VideoCapture(image_path)
+    
     if not video_capture.isOpened():
         print("Error opening video file.")
         exit()
@@ -88,7 +90,7 @@ def PedCarTrack(params):
 
         # Draw the trail for each object
         trail_colors = [(255, 0, 255)] * len(object_trails)  # Red color for all trails
-        draw_trail(output_image_frame, list(object_trails.values()), trail_colors)
+        draw_trail(output_image_frame, list(object_trails.values()), trail_colors, trail_length=27)
 
         # Remove trails of objects that are not detected in the current frame
         for tracker_id in list(object_trails.keys()):
@@ -99,7 +101,7 @@ def PedCarTrack(params):
             fourcc = cv2.VideoWriter_fourcc(
                 'm', 'p', '4', 'v')  # opencv3.0
             videoWriter = cv2.VideoWriter(
-                RESULT_PATH, fourcc, fps, (output_image_frame.shape[1], output_image_frame.shape[0]))
+                save_path, fourcc, fps, (output_image_frame.shape[1], output_image_frame.shape[0]))
 
         videoWriter.write(output_image_frame)
         cv2.imshow('Demo', output_image_frame)
@@ -108,6 +110,8 @@ def PedCarTrack(params):
     video_capture.release()
     videoWriter.release()
     cv2.destroyAllWindows()
+    
+    return f"已经实时显示追踪结果于屏幕上，结果文件保存在{save_path}"
 
 
 
