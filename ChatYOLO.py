@@ -78,7 +78,14 @@ class ChatRobot:
 
         # 使用 语言大模型 分析用户输入意图
         task_info = self._AnalyInput(question, task_descriptions)
-
+        
+        # 如果用户输入匹配不到任务则正常调用聊天接口
+        if task_info == "General": 
+            response = self.chat_inter.StreamResponse(self.messages)
+            self.messages.append({"role": "assistant", "content": response})
+            return response
+            
+            
         # 获取任务名称和参数
         task_type = task_info['task_type']
         task_params = task_info['parameters']
@@ -115,13 +122,24 @@ class ChatRobot:
         }}
         Precautions: 1. If the suffix unnecessary for a parameter is unnecessary and no information about the parameter is entered, it is unnecessary to write the returned content. 
         User input is as follows:
+        2.If the user input does not match the task, please return with the string 'General' 
         {user_input}
         """
         messages = [{"role": "system", "content": "You're a task extraction assistant."},
                     {"role": "user", "content": template}]
         task_info = self.chat_inter.UnstreamResponse(messages)
-        print(task_info)
-        return eval(task_info)  # 假设 GPT 返回 Python 字典格式
+        
+        # print(task_info)
+        if task_info == "General" : return "General"
+        
+        # 格式转化
+        try: 
+            task_info = eval(task_info)
+        except Exception as e:
+            print(task_info)
+            input("返回的内容格式不正确，输入任意内容继续：")
+        else:
+            return task_info  # 假设 GPT 返回 Python 字典格式
 
     
 if __name__ == '__main__':
@@ -133,5 +151,6 @@ if __name__ == '__main__':
         user_input = input("你: ")
         if user_input.lower() == '退出' or user_input.lower() == 'q':
             break
-        print("ChatYOLO:", end='')
+        print("ChatIR:", end='')
         chat_robot.ChatFrame(question=user_input)
+        print('')

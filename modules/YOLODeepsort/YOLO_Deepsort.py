@@ -10,6 +10,7 @@ import numpy as np
 import objtracker
 from objdetector import Detector
 import cv2
+import time
 
 
 RESULT_PATH = './results\\Track_results\\result.mp4'
@@ -62,11 +63,13 @@ def PedCarTrack(params):
     video_capture = cv2.VideoCapture(image_path)
     videoWriter = None
     fps = int(video_capture.get(5))
-    print('fps:', fps)
+    # print('fps:', fps)
 
     # Dictionary to store the trail points of each object
     object_trails = {}
-
+    
+    start_time = time.time()
+    print("正在处理文件，已经弹出实时追踪的窗口")
     while True:
         _, im = video_capture.read()
         if im is None:
@@ -110,6 +113,9 @@ def PedCarTrack(params):
     video_capture.release()
     videoWriter.release()
     cv2.destroyAllWindows()
+    spend_time = time.time() - start_time
+    print("处理完成")
+    print(f'处理耗时: {spend_time}s')
     
     return f"已经实时显示追踪结果于屏幕上，结果文件保存在{save_path}"
 

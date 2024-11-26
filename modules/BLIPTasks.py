@@ -35,11 +35,13 @@ def ImgDescription(params):
     text = "This picture show"
     inputs = processor(raw_image, text, return_tensors="pt")
 
+    print("正在分析图像")
     out = model.generate(**inputs, max_new_tokens=50)
     task_result = processor.decode(out[0], skip_special_tokens=True)
+    print("分析完成")
     # print(task_result)
 
     spend_time = time.time() - start_time
-    print(f'推理耗时: {spend_time}')
-    
+    # print(f'推理耗时: {spend_time}s')
+
     return task_result

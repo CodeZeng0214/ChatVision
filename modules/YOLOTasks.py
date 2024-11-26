@@ -22,9 +22,11 @@ def ObjDetect(params):
 
     # 加载 YOLO 模型
     model = YOLO(weight_path)
+    print("正在进行物体检测")
     results = model.predict(source=image_path, 
-                            save=True, save_txt=True, save_conf=True, project='./results',  
+                            save=False, save_txt=False, save_conf=False, project='./results',  
                             verbose=False, line_width=2)
+    print("检测完成")
 
     # 格式化结果
     detection_results = ['检测到以下对象：']
