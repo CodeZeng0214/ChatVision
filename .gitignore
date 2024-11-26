@@ -18,3 +18,5 @@ results/result.mp4
 /photos
 /results
 weights/YOLOv8/yolov8x_UAV.pt
+weights/YOLOv8/yolov8m.pt
+modules/YOLODeepsort/easydict/
