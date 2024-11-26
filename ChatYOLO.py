@@ -17,6 +17,7 @@ API_KEY = "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR" # 默认网站�
 GPT_MODEL = 'gpt-4o-mini' # 默认GPT模型
 DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类任务的权重路径
 POSE_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的人体姿态估计类任务的权重路径
+BLIP_PATH = './weights/blip-image-captioning-large' # BLIP 推理模型
 
 
 ### ========== ChatGPT聊天类 ========== ###
@@ -161,29 +162,39 @@ def HummanPoseTrack(params):
     results = model.track(source=image_path, show=is_show, stream=True)
     if results : return("已经显示于屏幕上")
     
-    
 
 #图像描述
 def ImgDescription(params):
 # pip install accelerate
+    import time
     import requests
     from PIL import Image
-    from transformers import Blip2Processor, Blip2ForConditionalGeneration
+    from transformers import BlipProcessor, BlipForConditionalGeneration
+    blip_path = params.get('weight_path', BLIP_PATH)
+    image_path = params['image_path']
 
-    processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
-    # model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b", device_map="auto")
-    model = Blip2ForConditionalGeneration.from_pretrained("Salesforce/blip2-opt-2.7b")
+    start_time = time.time()
 
-    img_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg' 
-    raw_image = Image.open(requests.get(img_url, stream=True).raw).convert('RGB')
+    # 本地模型
+    processor = BlipProcessor.from_pretrained(
+        blip_path, local_files_only=True)
+    model = BlipForConditionalGeneration.from_pretrained(
+        blip_path, local_files_only=True)
 
-    question = "how many dogs are in the picture?"
-    inputs = processor(raw_image, question, return_tensors="pt").to("cuda")
+    raw_image = Image.open(image_path).convert('RGB')
 
-    out = model.generate(**inputs)
-    print(processor.decode(out[0], skip_special_tokens=True).strip())
+    # conditional image captioning
+    text = "This picture show"
+    inputs = processor(raw_image, text, return_tensors="pt")
 
-    return 1
+    out = model.generate(**inputs, max_new_tokens=50)
+    task_result = processor.decode(out[0], skip_special_tokens=True)
+    print(task_result)
+
+    spend_time = start_time-time.time()
+    print(f'spend time: {spend_time}')
+
+    return task_result
     
 
 ### ========== 聊天机器人类 ========== ###

@@ -34,7 +34,7 @@ class Detector(baseDet):
 
     def detect(self, im):
         res = self.model.predict(im, imgsz=self.img_size, conf=self.conf,
-                                     iou=self.iou, device=self.device)
+                                     iou=self.iou, device=self.device, verbose=False)
                     
         detected_boxes = res[0].boxes
         pred_boxes = []
