@@ -12,9 +12,9 @@ from ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from TasksManager import TasksManager # 导入任务管理器
 
 ### ========== 导入任务模块 ========== ###
-from modules.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
-from modules.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
-from modules.BLIPTasks import ImgDescription
+from tasks.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
+from tasks.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
+from tasks.BLIPTasks import ImgDescription
     
     
 
