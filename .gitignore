@@ -18,3 +18,5 @@
 /weights/YOLOv8/yolov8x_UAV.pt
 /weights/YOLOv8/yolov8m.pt
 /modules/YOLODeepsort/easydict/
+/ClaudeChatVision/core/__pycache__
+/ClaudeChatVision/ui/__pycache__
