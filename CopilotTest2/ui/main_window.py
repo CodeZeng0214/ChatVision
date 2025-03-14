@@ -81,18 +81,6 @@ class MainWindow(QMainWindow):
         # 设置菜单
         settings_menu = menubar.addMenu(_("menu.settings"))
         
-        # 语言选择
-        lang_menu = settings_menu.addMenu(_("menu.language"))
-        
-        # 添加可用语言
-        zh_action = QAction("简体中文", self)
-        zh_action.triggered.connect(lambda: self._change_language("zh_CN"))
-        lang_menu.addAction(zh_action)
-        
-        en_action = QAction("English", self)
-        en_action.triggered.connect(lambda: self._change_language("en_US"))
-        lang_menu.addAction(en_action)
-        
         # 插件管理
         plugin_action = QAction(_("menu.manage_plugins"), self)
         plugin_action.triggered.connect(lambda: self.tabs.setCurrentIndex(1))

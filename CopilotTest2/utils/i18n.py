@@ -1,15 +1,15 @@
 """
-国际化支持模块
+简化版本的本地化支持模块
 """
 import os
 import json
 import logging
 
 class I18nManager:
-    """国际化管理器，提供多语言支持"""
+    """简化的国际化管理器，固定使用中文"""
     
     def __init__(self):
-        self.current_locale = "zh_CN"  # 默认使用中文
+        self.current_locale = "zh_CN"  # 固定使用中文
         self.translations = {}
         self.load_translations()
     
@@ -20,11 +20,7 @@ class I18nManager:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             locale_dir = os.path.join(base_dir, "resources", "locales")
             
-            # 如果目录不存在，创建它
-            if not os.path.exists(locale_dir):
-                os.makedirs(locale_dir)
-            
-            # 加载当前语言的翻译
+            # 加载中文翻译
             locale_file = os.path.join(locale_dir, f"{self.current_locale}.json")
             
             if os.path.exists(locale_file):
@@ -77,11 +73,6 @@ class I18nManager:
             "error.file_not_found": "未找到有效的文件",
             "error.processing_failed": "处理失败"
         }
-    
-    def set_locale(self, locale):
-        """设置当前语言"""
-        self.current_locale = locale
-        self.load_translations()
     
     def get_text(self, key, default=None):
         """获取翻译文本"""

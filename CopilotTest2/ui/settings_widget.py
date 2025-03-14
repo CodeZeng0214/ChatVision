@@ -1,10 +1,10 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                              QLabel, QComboBox, QTabWidget, QLineEdit,
-                              QFormLayout, QGroupBox, QSpinBox, QCheckBox)
+                              QLabel, QTabWidget, QLineEdit,
+                              QFormLayout, QGroupBox, QSpinBox)
 from PySide6.QtCore import Qt, Signal
 from config.llm_config import LLMConfig
 from config.app_config import AppConfig
-from utils.i18n import _, i18n
+from utils.i18n import _
 
 class SettingsWidget(QWidget):
     """设置界面"""
@@ -26,17 +26,6 @@ class SettingsWidget(QWidget):
         # 通用设置页
         general_tab = QWidget()
         general_layout = QVBoxLayout(general_tab)
-        
-        # 语言设置
-        lang_group = QGroupBox(_("settings.language"))
-        lang_layout = QFormLayout(lang_group)
-        
-        self.language_combo = QComboBox()
-        self.language_combo.addItem("简体中文", "zh_CN")
-        self.language_combo.addItem("English", "en_US")
-        lang_layout.addRow(_("settings.language_select"), self.language_combo)
-        
-        general_layout.addWidget(lang_group)
         
         # 界面设置
         ui_group = QGroupBox(_("settings.ui"))
@@ -102,11 +91,6 @@ class SettingsWidget(QWidget):
     def _load_settings(self):
         """加载设置"""
         # 加载通用设置
-        # 语言
-        index = self.language_combo.findData(i18n.current_locale)
-        if index >= 0:
-            self.language_combo.setCurrentIndex(index)
-            
         # 窗口尺寸
         self.default_width.setValue(AppConfig.DEFAULT_WINDOW_WIDTH)
         self.default_height.setValue(AppConfig.DEFAULT_WINDOW_HEIGHT)
@@ -121,11 +105,6 @@ class SettingsWidget(QWidget):
     def _save_settings(self):
         """保存设置"""
         # 保存通用设置
-        # 语言
-        new_locale = self.language_combo.currentData()
-        if new_locale != i18n.current_locale:
-            i18n.set_locale(new_locale)
-            
         # 窗口尺寸
         AppConfig.DEFAULT_WINDOW_WIDTH = self.default_width.value()
         AppConfig.DEFAULT_WINDOW_HEIGHT = self.default_height.value()
