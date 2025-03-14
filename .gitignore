@@ -30,3 +30,6 @@
 /CopilotTest2/ui/__pycache__
 /CopilotTest2/utils/__pycache__
 /CopilotTest2/resources/__pycache__
+/tasks/__pycache__
+/gui/__pycache__
+/tasks/YOLODeepsort/__pycache__

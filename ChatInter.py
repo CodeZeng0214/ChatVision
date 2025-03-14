@@ -38,7 +38,7 @@ class ChatGPT():
         """为提供的对话消息创建新的回答(流式响应)\n
         messages (list): 完整的对话消息以增强上下文的记忆
         """
-        # print(messages[0]['content']) 测试输入给ChatGPT的信息
+        # print(messages[0]['content']) # 测试输入给ChatGPT的信息
         stream = self.chatcase.chat.completions.create(
             model = self.model,
             messages = messages,
@@ -46,7 +46,7 @@ class ChatGPT():
         )
         response = ""
         for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
+            if chunk.choices and chunk.choices[0].delta.content:
                 response += chunk.choices[0].delta.content
                 print(chunk.choices[0].delta.content, end = "")
         print("")

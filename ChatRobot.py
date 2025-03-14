@@ -2,33 +2,56 @@
 ### 2024.11.18 创建主函数，调用其他模块完成对话
 ### 2024.11.23 基于CodeCopilot进行代码重构，代码汇总至这一个文件
 ### 2024.11.26 代码框架分散化，提高可维护性
-
-#@ 待解决的问题： 如何确保一个新加的模块的库的安装准确
-#@ 待解决的问题： 如何让ChatGPT记忆上次任务的结果并认为是自己完成了任务
-
+### 2024.12.XX 添加GUI支持和参数交互能力
 
 ### ========== 导入辅助模块 ========== ###
 from ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from TasksManager import TasksManager # 导入任务管理器
 
+# 条件导入PySide6，使程序在没有安装PySide6时也能以命令行方式运行
+try:
+    from PySide6.QtCore import QObject, Signal
+    HAS_PYSIDE = True
+except ImportError:
+    HAS_PYSIDE = False
+    # 如果没有PySide6，创建一个简单的替代类
+    class QObject:
+        pass
+    
+    class Signal:
+        def __init__(self, *args):
+            pass
+        
+        def emit(self, *args):
+            pass
+    
 ### ========== 导入任务模块 ========== ###
 from tasks.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
 from tasks.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
 from tasks.BLIPTasks import ImgDescription
     
-    
-
 ### ========== 聊天机器人类 ========== ###
-class ChatRobot:
+class ChatRobot(QObject):
+    # 定义信号
+    response_ready = Signal(str) if HAS_PYSIDE else None  # 回复准备好时的信号
+    parameters_needed = Signal(list) if HAS_PYSIDE else None  # 需要参数时的信号
+    processing_task = Signal(str) if HAS_PYSIDE else None  # 处理任务时的信号
+    task_completed = Signal(str, str) if HAS_PYSIDE else None  # 任务完成时的信号
+
     def __init__(self, chat_inter=ChatGPT(), init_message="你是一个能够进行图像识别的聊天机器人."):
         """
         可选参数：\n
         -chat_inter 与语言模型通讯的聊天接口，默认为ChatGPT
         init_message 初始化内容，默认"你是一个能够进行图像识别的聊天机器人."
         """
+        if HAS_PYSIDE:
+            super().__init__()
+        
         self.chat_inter = chat_inter
         self.messages = [{"role": "system", "content": init_message}]
         self.task_manager = TasksManager() # 实例化一个任务管理器
+        self.current_task = None  # 当前处理的任务
+        self.waiting_for_params = False  # 是否等待参数
         self._RegisterTasks()
 
     def _RegisterTasks(self):
@@ -36,33 +59,33 @@ class ChatRobot:
         self.task_manager.register_task(
             "ObjectDetect",
             ObjDetect,
-            "Detect objects or humans in the image, can count",
-             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
-             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False},
-             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return a boolean value without quotation marks: True or False(capitalize the first letter)", "required": False}]
+            "检测图像中的物体或人物，可以计数",
+             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
+             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
+             {"name": "is_show", "description": "是否需要在屏幕上显示结果", "required": False}]
         )
         self.task_manager.register_task(
             "HumanPoseEstimate", 
             HummanPoseTrack, 
-            "Can only estimate human posture, not count",
-             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
-             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False}, 
-             {"name": "is_show", "description": "Whether it needs to be displayed on screen, return a boolean value without quotation marks: True or False(capitalize the first letter)", "required": False}]
+            "只能估计人体姿态，不能计数",
+             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
+             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}, 
+             {"name": "is_show", "description": "是否需要在屏幕上显示结果", "required": False}]
         )
         self.task_manager.register_task(
-            "Pedestrian and Vehicle tracking", 
+            "PedestrianAndVehicleTracking", 
             PedCarTrack, 
-            "Track pedestrians and vehicles",
-             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
-             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False},
-            {"name": "save_path", "description": "Storage path of the task result file", "required": False}]
+            "跟踪行人和车辆",
+             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
+             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
+             {"name": "save_path", "description": "任务结果文件的存储路径", "required": False}]
         )
         self.task_manager.register_task(
-            "Image Description", 
+            "ImageDescription", 
             ImgDescription, 
-            "Can describe the image in one sentence",
-             [{"name": "image_path", "description": "A task object is moved to a file path in image or video format","required": True}, 
-             {"name": "weight_path", "description": "The weight that the user specifies when the task is performed", "required": False}]
+            "可以用一句话描述图像内容",
+             [{"name": "image_path", "description": "图像文件的路径", "required": True}, 
+             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}]
         )
 
     # 主框架
@@ -71,6 +94,7 @@ class ChatRobot:
         主处理逻辑：从用户输入到任务结果返回。\n
         输入参数，即用户的问题输入
         """
+        #print(f"用户: {question}")
         self.messages.append({"role": "user", "content": question})
 
         # 告知 语言大模型 支持的任务的 提示模板
@@ -81,29 +105,58 @@ class ChatRobot:
         
         # 如果用户输入匹配不到任务则正常调用聊天接口
         if task_info == "General": 
+            self.processing_task.emit("正在思考...") if HAS_PYSIDE else None
             response = self.chat_inter.StreamResponse(self.messages)
+            print(f"ChatIR: {response}")
             self.messages.append({"role": "assistant", "content": response})
+            self.response_ready.emit(response) if HAS_PYSIDE else None
             return response
-            
             
         # 获取任务名称和参数
         task_type = task_info['task_type']
         task_params = task_info['parameters']
-
+        
+        # 检查是否缺少必要参数
+        task_def = self.task_manager.GetTask(task_type)
+        if not task_def:
+            response = f"未知任务类型：{task_type}"
+            self.response_ready.emit(response) if HAS_PYSIDE else None
+            return response
+            
+        required_params = [p for p in task_def["parameters"] if p.get("required", False)]
+        missing_params = []
+        
+        for param in required_params:
+            if param["name"] not in task_params:
+                missing_params.append(param)
+        
+        # 如果缺少必要参数，通知GUI
+        if missing_params:
+            self.current_task = task_type
+            self.waiting_for_params = True
+            self.parameters_needed.emit(required_params) if HAS_PYSIDE else None
+            return f"需要提供更多参数来完成{task_type}任务"
+            
         # 查找并执行任务
-        task_callable = self.task_manager.GetTask(task_type)
-        if not task_callable:
-            return f"未知任务类型：{task_type}"
-
+        task_callable = task_def["callable"]
+        
+        # 通知GUI任务开始处理
+        self.processing_task.emit(f"正在执行{task_type}任务...") if HAS_PYSIDE else None
+        
         # 执行任务
-        task_results = task_callable["callable"](task_params)
-
+        task_results = task_callable(task_params)
+        
+        # 通知任务已完成
+        if "image_path" in task_params:
+            self.task_completed.emit(task_type, task_params["image_path"]) if HAS_PYSIDE else None
+        
         # 用 GPT 根据结果生成自然语言回复
         result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
         response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                        + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                        + question}])
+                                    + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
+                                    + question}])
         self.messages.append({"role": "assistant", "content": response})
+        self.response_ready.emit(response) if HAS_PYSIDE else None
         return response
 
     def _AnalyInput(self, user_input, task_descriptions):
@@ -136,10 +189,43 @@ class ChatRobot:
         try: 
             task_info = eval(task_info)
         except Exception as e:
-            print(task_info)
-            input("返回的内容格式不正确，输入任意内容继续：")
+            print(f"返回的内容格式不正确: {e}")
+            return "General"
         else:
             return task_info  # 假设 GPT 返回 Python 字典格式
+    
+    def set_parameters(self, parameters):
+        """设置参数并继续执行任务"""
+        if not self.waiting_for_params or not self.current_task:
+            return False
+            
+        task_def = self.task_manager.GetTask(self.current_task)
+        if not task_def:
+            return False
+            
+        # 执行任务
+        self.processing_task.emit(f"正在执行{self.current_task}任务...") if HAS_PYSIDE else None
+        task_results = task_def["callable"](parameters)
+        
+        # 通知任务已完成
+        if "image_path" in parameters:
+            self.task_completed.emit(self.current_task, parameters["image_path"]) if HAS_PYSIDE else None
+        
+        # 用 GPT 根据结果生成自然语言回复
+        last_question = self.messages[-1]["content"] if self.messages else ""
+        result_summary = f"任务类型：{self.current_task}\n任务结果：{task_results}"
+        response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
+                                    + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
+                                    + last_question}])
+        
+        self.messages.append({"role": "assistant", "content": response})
+        self.response_ready.emit(response) if HAS_PYSIDE else None
+        
+        # 重置状态
+        self.waiting_for_params = False
+        self.current_task = None
+        
+        return True
 
     
 if __name__ == '__main__':
