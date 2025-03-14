@@ -8,6 +8,7 @@ from ui.sidebar_widget import SidebarWidget
 from ui.param_dialog import ParamDialog  # 导入参数对话框类
 import tempfile
 from utils.i18n import _
+from core.message import Message
 
 class MessageItem(QWidget):
     """消息项组件"""
@@ -174,6 +175,9 @@ class ChatWidget(QWidget):
         self.chat_engine.on_show_sidebar = self.on_show_sidebar
         
         self._setup_ui()
+        
+        # 添加欢迎消息
+        self._show_welcome_message()
     
     def _setup_ui(self):
         """设置聊天界面"""
@@ -378,3 +382,14 @@ class ChatWidget(QWidget):
         elif display_type == "directory" and args:
             # 目录显示可以使用图像比较组件，或实现专门的目录浏览组件
             pass
+    
+    def _show_welcome_message(self):
+        """显示欢迎消息"""
+        welcome_msg = Message(
+            "您好！我是ChatVision，既可以进行普通聊天，也能处理图像和视频。\n\n"
+            "- 直接发送文字消息可以进行普通聊天\n"
+            "- 发送图片可以请我描述图片内容或识别图中物体\n"
+            "- 您也可以明确指出任务，例如「识别这张图片中有什么物体」", 
+            "assistant"
+        )
+        self.on_new_message(welcome_msg)

@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget, QMessageBox, QApplication
+from PySide6.QtWidgets import QMainWindow, QTabWidget, QVBoxLayout, QWidget, QMessageBox, QApplication, QStyle
 from PySide6.QtCore import Qt, QSize, QEvent
 from PySide6.QtGui import QIcon, QAction, QCloseEvent
 from ui.chat_widget import ChatWidget
@@ -304,7 +304,7 @@ class MainWindow(QMainWindow):
                 self.app_tray.showMessage(
                     _("app.name"),
                     _("tray.minimized_message"),
-                    QApplication.style().standardIcon(QApplication.style().SP_MessageBoxInformation),
+                    QStyle.SP_MessageBoxInformation,  # 正确的枚举引用方式
                     3000  # 显示3秒
                 )
                 self._tray_notification_shown = True

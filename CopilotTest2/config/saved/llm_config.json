@@ -1,5 +1,5 @@
 {
-    "base_url": "https://api.openai.com/v1",
+    "base_url": "https://api.chatanywhere.tech/v1",
     "api_key": "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR",
     "model": "gpt-4o-mini",
     "max_tokens": 2000,

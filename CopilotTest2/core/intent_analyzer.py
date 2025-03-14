@@ -17,6 +17,29 @@ class IntentAnalyzer:
     
     def __init__(self, llm_client):
         self.llm_client = llm_client
+        # 定义任务相关的关键词
+        self.task_keywords = {
+            "image_recognition": [
+                "识别", "检测", "识别物体", "detect", "recognize", "recognition", 
+                "物体", "找出", "有什么东西", "yolo", "是什么"
+            ],
+            "image_description": [
+                "描述", "describe", "告诉我这是什么", "这张图", "看到了什么", 
+                "内容是什么", "图中是什么", "解释图片", "blip"
+            ],
+            "pose_estimation": [
+                "姿势", "姿态", "pose", "人体姿态", "肢体", "动作", "站姿", 
+                "人体关键点", "关键点检测", "skeleton"
+            ],
+            "batch_processing": [
+                "批量", "文件夹", "目录", "batch", "多个图片", "多张图片",
+                "所有图片", "一组", "一批", "处理多个"
+            ],
+            "realtime_processing": [
+                "实时", "摄像头", "相机", "camera", "realtime", "视频", "video",
+                "直播", "stream", "流"
+            ]
+        }
     
     def analyze_intent(self, user_message, attached_files=None):
         """
@@ -29,69 +52,97 @@ class IntentAnalyzer:
         Returns:
             dict: 分析结果，包含任务类型和参数
         """
-        # 构建意图分析提示
-        prompt = self._build_intent_prompt(user_message, attached_files)
-        
-        # 使用简单规则进行意图分析
-        task_type = "general_chat"  # 默认为普通聊天
+        # 默认设置为普通聊天
+        task_type = "general_chat"  
         parameters = {}
         
-        # 如果有附加文件，进行进一步分析
-        if attached_files:
-            # 根据文件类型和消息内容判断任务类型
-            file_types = [self._get_file_type(f) for f in attached_files]
+        # 文本为空且没有附件，肯定是普通聊天
+        if not user_message.strip() and not attached_files:
+            return {"task_type": task_type, "parameters": parameters}
             
-            # 检查是否包含图像文件
-            if "image" in file_types:
-                image_files = [f for i, f in enumerate(attached_files) if file_types[i] == "image"]
-                
-                # 根据消息内容确定是图像识别还是图像描述
-                if any(keyword in user_message.lower() for keyword in ["识别", "检测", "识别物体", "detect", "recognize"]):
-                    task_type = "image_recognition"
-                    parameters["image"] = image_files[0]  # 使用第一张图片
-                    parameters["files"] = image_files
-                elif any(keyword in user_message.lower() for keyword in ["姿势", "姿态", "pose", "人体姿态"]):
-                    task_type = "pose_estimation"
-                    parameters["image"] = image_files[0]
-                    parameters["files"] = image_files
-                elif any(keyword in user_message.lower() for keyword in ["批量", "文件夹", "目录", "batch", "多个图片", "多张图片"]):
-                    task_type = "batch_processing"
-                    parameters["files"] = image_files
-                elif any(keyword in user_message.lower() for keyword in ["实时", "摄像头", "相机", "camera", "realtime", "视频", "video"]):
-                    task_type = "realtime_processing"
-                    if "video" in file_types:
-                        video_files = [f for i, f in enumerate(attached_files) if file_types[i] == "video"]
-                        parameters["video"] = video_files[0]
+        # 如果有附加文件，可能需要进行图像处理
+        has_image_files = False
+        has_video_files = False
+        
+        if attached_files:
+            # 分析附加文件类型
+            file_types = [self._get_file_type(f) for f in attached_files]
+            has_image_files = "image" in file_types
+            has_video_files = "video" in file_types
+            
+            # 获取图像和视频文件列表
+            image_files = [f for i, f in enumerate(attached_files) if file_types[i] == "image"]
+            video_files = [f for i, f in enumerate(attached_files) if file_types[i] == "video"]
+        
+        # 任务意图检测 - 先检查明确的任务关键词
+        detected_task = self._detect_task_from_keywords(user_message)
+        
+        if detected_task:
+            # 如果检测到明确的任务关键词，使用该任务
+            task_type = detected_task
+            
+            # 准备任务参数
+            if task_type == "image_recognition" and has_image_files:
+                parameters["image"] = image_files[0]
+                parameters["files"] = image_files
+            elif task_type == "image_description" and has_image_files:
+                parameters["image"] = image_files[0]
+                parameters["files"] = image_files
+            elif task_type == "pose_estimation" and has_image_files:
+                parameters["image"] = image_files[0]
+                parameters["files"] = image_files
+            elif task_type == "batch_processing" and has_image_files:
+                parameters["files"] = image_files
+            elif task_type == "realtime_processing":
+                if has_video_files:
+                    parameters["video"] = video_files[0]
+                    parameters["files"] = video_files
                 else:
-                    # 默认使用图像描述
+                    parameters["camera_id"] = 0  # 默认摄像头
+        
+        # 如果没有检测到明确任务，但有图像或视频文件附件
+        elif has_image_files or has_video_files:
+            # 根据消息内容和文件类型推断可能的任务
+            
+            # 如果消息很短或为空，判断为用户想要处理附加的媒体文件
+            if len(user_message.strip()) <= 10:
+                # 短消息+图片：默认为图像描述
+                if has_image_files:
                     task_type = "image_description"
                     parameters["image"] = image_files[0]
                     parameters["files"] = image_files
-            
-            # 检查是否包含视频文件
-            elif "video" in file_types:
-                video_files = [f for i, f in enumerate(attached_files) if file_types[i] == "video"]
-                task_type = "realtime_processing"
-                parameters["video"] = video_files[0]
-                parameters["files"] = video_files
+                # 短消息+视频：默认为实时处理
+                elif has_video_files:
+                    task_type = "realtime_processing"
+                    parameters["video"] = video_files[0]
+                    parameters["files"] = video_files
+            else:
+                # 如果消息较长，则可能是普通聊天，保持默认的general_chat
+                # 但如果消息中有"这张图"、"这个视频"等指示词，可能是在询问媒体内容
+                if has_image_files and any(phrase in user_message.lower() for phrase in ["这张图", "图中", "图像", "图片里"]):
+                    task_type = "image_description"
+                    parameters["image"] = image_files[0]
+                    parameters["files"] = image_files
         
         return {
             "task_type": task_type,
             "parameters": parameters
         }
     
-    def _build_intent_prompt(self, user_message, attached_files):
-        """构建意图分析提示"""
-        prompt = f"用户消息: {user_message}\n"
+    def _detect_task_from_keywords(self, message):
+        """从消息中检测任务类型"""
+        # 转换为小写以进行大小写不敏感匹配
+        lower_message = message.lower()
         
-        if attached_files:
-            prompt += "附加文件:\n"
-            for file in attached_files:
-                file_type = self._get_file_type(file)
-                prompt += f"- {os.path.basename(file)} ({file_type})\n"
+        # 检查每种任务类型的关键词
+        for task_type, keywords in self.task_keywords.items():
+            for keyword in keywords:
+                # 使用正则表达式进行单词边界匹配，避免部分匹配
+                if re.search(r'\b' + re.escape(keyword.lower()) + r'\b', lower_message) or keyword.lower() in lower_message:
+                    return task_type
         
-        prompt += "\n请分析用户意图，确定任务类型和所需参数。"
-        return prompt
+        # 没有找到明确的任务关键词
+        return None
     
     def _get_file_type(self, filepath):
         """
@@ -136,6 +187,10 @@ class IntentAnalyzer:
         Returns:
             tuple: (是否完整, 缺少的参数列表)
         """
+        # 普通聊天不需要额外参数
+        if task_type == "general_chat":
+            return True, []
+            
         required_params = self._get_required_parameters(task_type)
         
         # 检查所有必需参数是否都存在

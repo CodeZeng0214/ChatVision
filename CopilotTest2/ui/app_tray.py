@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
+from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication, QStyle
 from PySide6.QtGui import QIcon, QAction
 import os
 from utils.i18n import _
@@ -76,4 +76,4 @@ class AppTray(QSystemTrayIcon):
     
     def show_message(self, title, message):
         """显示托盘通知"""
-        self.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, 3000)  # 显示3秒
+        self.showMessage(title, message, QSystemTrayIcon.MessageIcon.Information, 3000)  # 使用正确的枚举

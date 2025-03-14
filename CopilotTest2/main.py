@@ -84,7 +84,7 @@ def main(debug=False, log_level=logging.INFO, no_gui=False):
         
         # 设置应用样式表
         try:
-            with open(os.path.join(current_dir, "resources", "style.qss"), "r") as f:
+            with open(os.path.join(current_dir, "resources", "style.qss"), "r", encoding="utf-8") as f:
                 app.setStyleSheet(f.read())
         except Exception as e:
             logging.warning(f"未能加载样式表文件: {str(e)}")

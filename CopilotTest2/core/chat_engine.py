@@ -1,3 +1,4 @@
+import logging
 from core.llm_client import LLMClient
 from core.intent_analyzer import IntentAnalyzer
 from core.message import Message  # 导入消息类而不是重新定义
@@ -30,17 +31,21 @@ class ChatEngine:
         task_type = intent_data["task_type"]
         parameters = intent_data["parameters"]
         
-        # 检查参数是否完整
-        params_complete, missing_params = self.intent_analyzer.check_parameters(task_type, parameters)
-        
-        if not params_complete and self.on_require_params:
-            # 如果参数不完整且设置了参数请求回调，调用回调
-            self.on_require_params(task_type, missing_params)
-            return
+        # 根据任务类型选择处理方式
+        if task_type == "general_chat":
+            # 普通聊天消息，直接发送给LLM
+            logging.info("检测到普通聊天，将消息发送给LLM")
+            response = self.llm_client.send_message(content)
+        else:
+            # 任务型消息，检查参数是否完整
+            params_complete, missing_params = self.intent_analyzer.check_parameters(task_type, parameters)
             
-        # 参数完整，处理消息
-        if task_type != "general_chat":
-            # 任务型消息，使用插件处理
+            if not params_complete and self.on_require_params:
+                # 如果参数不完整且设置了参数请求回调，调用回调
+                self.on_require_params(task_type, missing_params)
+                return
+                
+            # 参数完整，使用插件处理任务
             if self.on_processing:
                 self.on_processing(True, f"正在处理{task_type}任务...")
                 
@@ -59,15 +64,12 @@ class ChatEngine:
                     # 将处理结果发送给LLM生成自然语言回复
                     response = self._generate_response_with_result(content, result, task_type)
                 else:
-                    response = f"抱歉，找不到处理{task_type}的插件。"
+                    response = f"抱歉，找不到处理{task_type}的插件。如果您想进行普通聊天，请直接输入问题而不要提及图像处理相关词汇。"
             except Exception as e:
                 response = f"处理任务时出错: {str(e)}"
             finally:
                 if self.on_processing:
                     self.on_processing(False)
-        else:
-            # 普通聊天消息，直接发送给LLM
-            response = self.llm_client.send_message(content)
         
         # 创建并存储机器人回复消息
         assistant_msg = Message(response, "assistant")

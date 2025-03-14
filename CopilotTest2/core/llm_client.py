@@ -27,6 +27,8 @@ class LLMClient:
     def send_message(self, user_message):
         """发送消息并获取回复"""
         try:
+            # 记录普通聊天请求
+            logging.info("发送普通聊天消息到LLM")
             self.add_message("user", user_message)
             
             headers = {
@@ -54,7 +56,7 @@ class LLMClient:
             if response.status_code == 200:
                 assistant_message = response_data["choices"][0]["message"]["content"]
                 self.add_message("assistant", assistant_message)
-                logging.info("收到 LLM API 回复")
+                logging.info("收到LLM普通聊天回复")
                 return assistant_message
             else:
                 error_message = f"API错误: {response_data.get('error', {}).get('message', '未知错误')}"
