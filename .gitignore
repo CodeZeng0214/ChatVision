@@ -20,3 +20,12 @@
 /modules/YOLODeepsort/easydict/
 /ClaudeChatVision/core/__pycache__
 /ClaudeChatVision/ui/__pycache__
+/CopilotTest2/__pycache__
+/CopilotTest2/config/__pycache__
+/CopilotTest2/core/__pycache__
+/CopilotTest2/plugins/__pycache__
+/CopilotTest2/plugins/image_description/__pycache__
+/CopilotTest2/plugins/image_recognition/__pycache__
+/CopilotTest2/resources/icons/__pycache__
+/CopilotTest2/ui/__pycache__
+/CopilotTest2/utils/__pycache__
