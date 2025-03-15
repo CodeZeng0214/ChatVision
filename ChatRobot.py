@@ -2,29 +2,25 @@
 ### 2024.11.18 创建主函数，调用其他模块完成对话
 ### 2024.11.23 基于CodeCopilot进行代码重构，代码汇总至这一个文件
 ### 2024.11.26 代码框架分散化，提高可维护性
-### 2024.12.XX 添加GUI支持和参数交互能力
-### 2024.12.XX 添加多线程支持，避免界面卡顿
+### 2025.03.14 添加GUI支持和参数交互能力
+### 2025.03.15 添加多线程支持，避免界面卡顿
 
 ### ========== 导入辅助模块 ========== ###
 from ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from TasksManager import TasksManager # 导入任务管理器
 
-# 条件导入PySide6，使程序在没有安装PySide6时也能以命令行方式运行
-try:
+# 条件导入PySide6，当此脚本不是启动脚本时导入
+if __name__ != '__main__':
     from PySide6.QtCore import QObject, Signal
     HAS_PYSIDE = True
-except ImportError:
+else:
+    ## 此脚本作为调试脚本debug时，不导入PySide6
     HAS_PYSIDE = False
-    # 如果没有PySide6，创建一个简单的替代类
-    class QObject:
-        pass
-    
+    # 在调试的时候，创建一个简单的替代类
+    class QObject: pass
     class Signal:
-        def __init__(self, *args):
-            pass
-        
-        def emit(self, *args):
-            pass
+        def __init__(self, *args): pass
+        def emit(self, *args): pass
     
 ### ========== 导入任务模块 ========== ###
 from tasks.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
@@ -110,7 +106,6 @@ class ChatRobot(QObject):
                 if HAS_PYSIDE:
                     self.processing_task.emit("正在思考...")
                 response = self.chat_inter.StreamResponse(self.messages)
-                print(f"ChatIR: {response}")
                 self.messages.append({"role": "assistant", "content": response})
                 if HAS_PYSIDE:
                     self.response_ready.emit(response)
@@ -141,7 +136,9 @@ class ChatRobot(QObject):
                 self.waiting_for_params = True
                 if HAS_PYSIDE:
                     self.parameters_needed.emit(required_params)
-                return f"需要提供更多参数来完成{task_type}任务"
+                missing_message = f"需要提供以下参数：{', '.join([p['name'] for p in missing_params])}"
+                print(missing_message)
+                return missing_message
                 
             # 查找并执行任务
             task_callable = task_def["callable"]
@@ -187,9 +184,25 @@ class ChatRobot(QObject):
             "task_type": <task type>,
             "parameters": <parameter dictionary>
         }}
-        Precautions: 1. If the suffix unnecessary for a parameter is unnecessary and no information about the parameter is entered, it is unnecessary to write the returned content. 
-        User input is as follows:
-        2.If the user input does not match the task, please return with the string 'General' 
+        Hint :1. If the description of the parameter "required" is "False", there is no need to write the returned content. However, if the user enters the corresponding parameter requirements, the return information needs to be written. 
+        2. If the user input does not match any of the tasks that can be performed, return the string "General". 
+        3. If the user intends to perform a task, but the parameter "required" is "True" is missing, do not write this parameter in the return information
+        An example of a user entering correct parameters:
+            User enters: "D:\Code\ChatVision\photos\\bus.jpg", what is on this picture"
+            Your answer: {{
+                "task_type": "ObjectDetect",
+                "parameters": {{
+                "image_path": "D:\\\\Code\\\\ChatVision\\\\photos\\\\bus.jpg"  
+                }}
+            }}
+        An example of insufficient user input parameters:
+           User enters: what is on this picture
+            Your answer: {{
+                "task_type": "ObjectDetect",
+                "parameters": {{ 
+                }}
+            }}
+        User input is as follows: 
         {user_input}
         """
         messages = [{"role": "system", "content": "You're a task extraction assistant."},
@@ -243,7 +256,7 @@ class ChatRobot(QObject):
 
     
 if __name__ == '__main__':
-
+        
     chat_robot = ChatRobot()
     
     print("开始对话（输入'退出'或'q'以结束）：")
