@@ -3,6 +3,7 @@
 ### 2024.11.23 基于CodeCopilot进行代码重构，代码汇总至这一个文件
 ### 2024.11.26 代码框架分散化，提高可维护性
 ### 2024.12.XX 添加GUI支持和参数交互能力
+### 2024.12.XX 添加多线程支持，避免界面卡顿
 
 ### ========== 导入辅助模块 ========== ###
 from ChatInter import ChatGPT # 导入ChatGPT聊天接口
@@ -27,8 +28,8 @@ except ImportError:
     
 ### ========== 导入任务模块 ========== ###
 from tasks.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
-from tasks.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
-from tasks.BLIPTasks import ImgDescription
+# from tasks.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
+# from tasks.BLIPTasks import ImgDescription
     
 ### ========== 聊天机器人类 ========== ###
 class ChatRobot(QObject):
@@ -72,21 +73,21 @@ class ChatRobot(QObject):
              {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}, 
              {"name": "is_show", "description": "是否需要在屏幕上显示结果", "required": False}]
         )
-        self.task_manager.register_task(
-            "PedestrianAndVehicleTracking", 
-            PedCarTrack, 
-            "跟踪行人和车辆",
-             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
-             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
-             {"name": "save_path", "description": "任务结果文件的存储路径", "required": False}]
-        )
-        self.task_manager.register_task(
-            "ImageDescription", 
-            ImgDescription, 
-            "可以用一句话描述图像内容",
-             [{"name": "image_path", "description": "图像文件的路径", "required": True}, 
-             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}]
-        )
+        # self.task_manager.register_task(
+        #     "PedestrianAndVehicleTracking", 
+        #     PedCarTrack, 
+        #     "跟踪行人和车辆",
+        #      [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
+        #      {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
+        #      {"name": "save_path", "description": "任务结果文件的存储路径", "required": False}]
+        # )
+        # self.task_manager.register_task(
+        #     "ImageDescription", 
+        #     ImgDescription, 
+        #     "可以用一句话描述图像内容",
+        #      [{"name": "image_path", "description": "图像文件的路径", "required": True}, 
+        #      {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}]
+        # )
 
     # 主框架
     def ChatFrame(self, question):
@@ -94,70 +95,83 @@ class ChatRobot(QObject):
         主处理逻辑：从用户输入到任务结果返回。\n
         输入参数，即用户的问题输入
         """
-        #print(f"用户: {question}")
-        self.messages.append({"role": "user", "content": question})
+        try:
+            #print(f"用户: {question}")
+            self.messages.append({"role": "user", "content": question})
 
-        # 告知 语言大模型 支持的任务的 提示模板
-        task_descriptions = self.task_manager.DescribeTasks()
+            # 告知 语言大模型 支持的任务的 提示模板
+            task_descriptions = self.task_manager.DescribeTasks()
 
-        # 使用 语言大模型 分析用户输入意图
-        task_info = self._AnalyInput(question, task_descriptions)
-        
-        # 如果用户输入匹配不到任务则正常调用聊天接口
-        if task_info == "General": 
-            self.processing_task.emit("正在思考...") if HAS_PYSIDE else None
-            response = self.chat_inter.StreamResponse(self.messages)
-            print(f"ChatIR: {response}")
+            # 使用 语言大模型 分析用户输入意图
+            task_info = self._AnalyInput(question, task_descriptions)
+            
+            # 如果用户输入匹配不到任务则正常调用聊天接口
+            if task_info == "General": 
+                if HAS_PYSIDE:
+                    self.processing_task.emit("正在思考...")
+                response = self.chat_inter.StreamResponse(self.messages)
+                print(f"ChatIR: {response}")
+                self.messages.append({"role": "assistant", "content": response})
+                if HAS_PYSIDE:
+                    self.response_ready.emit(response)
+                return response
+                
+            # 获取任务名称和参数
+            task_type = task_info['task_type']
+            task_params = task_info['parameters']
+            
+            # 检查是否缺少必要参数
+            task_def = self.task_manager.GetTask(task_type)
+            if not task_def:
+                response = f"未知任务类型：{task_type}"
+                if HAS_PYSIDE:
+                    self.response_ready.emit(response)
+                return response
+                
+            required_params = [p for p in task_def["parameters"] if p.get("required", False)]
+            missing_params = []
+            
+            for param in required_params:
+                if param["name"] not in task_params:
+                    missing_params.append(param)
+            
+            # 如果缺少必要参数，通知GUI
+            if missing_params:
+                self.current_task = task_type
+                self.waiting_for_params = True
+                if HAS_PYSIDE:
+                    self.parameters_needed.emit(required_params)
+                return f"需要提供更多参数来完成{task_type}任务"
+                
+            # 查找并执行任务
+            task_callable = task_def["callable"]
+            
+            # 通知GUI任务开始处理
+            if HAS_PYSIDE:
+                self.processing_task.emit(f"正在执行{task_type}任务...")
+            
+            # 执行任务
+            task_results = task_callable(task_params)
+            
+            # 通知任务已完成
+            if "image_path" in task_params and HAS_PYSIDE:
+                self.task_completed.emit(task_type, task_params["image_path"])
+            
+            # 用 GPT 根据结果生成自然语言回复
+            result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
+            response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
+                                        + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
+                                        + question}])
             self.messages.append({"role": "assistant", "content": response})
-            self.response_ready.emit(response) if HAS_PYSIDE else None
+            if HAS_PYSIDE:
+                self.response_ready.emit(response)
             return response
-            
-        # 获取任务名称和参数
-        task_type = task_info['task_type']
-        task_params = task_info['parameters']
-        
-        # 检查是否缺少必要参数
-        task_def = self.task_manager.GetTask(task_type)
-        if not task_def:
-            response = f"未知任务类型：{task_type}"
-            self.response_ready.emit(response) if HAS_PYSIDE else None
-            return response
-            
-        required_params = [p for p in task_def["parameters"] if p.get("required", False)]
-        missing_params = []
-        
-        for param in required_params:
-            if param["name"] not in task_params:
-                missing_params.append(param)
-        
-        # 如果缺少必要参数，通知GUI
-        if missing_params:
-            self.current_task = task_type
-            self.waiting_for_params = True
-            self.parameters_needed.emit(required_params) if HAS_PYSIDE else None
-            return f"需要提供更多参数来完成{task_type}任务"
-            
-        # 查找并执行任务
-        task_callable = task_def["callable"]
-        
-        # 通知GUI任务开始处理
-        self.processing_task.emit(f"正在执行{task_type}任务...") if HAS_PYSIDE else None
-        
-        # 执行任务
-        task_results = task_callable(task_params)
-        
-        # 通知任务已完成
-        if "image_path" in task_params:
-            self.task_completed.emit(task_type, task_params["image_path"]) if HAS_PYSIDE else None
-        
-        # 用 GPT 根据结果生成自然语言回复
-        result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
-        response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                    + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                    + question}])
-        self.messages.append({"role": "assistant", "content": response})
-        self.response_ready.emit(response) if HAS_PYSIDE else None
-        return response
+        except Exception as e:
+            error_message = f"处理消息时发生错误: {e}"
+            print(error_message)
+            if HAS_PYSIDE:
+                self.response_ready.emit(error_message)
+            return error_message
 
     def _AnalyInput(self, user_input, task_descriptions):
         """

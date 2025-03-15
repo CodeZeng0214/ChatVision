@@ -1,4 +1,5 @@
 import os
+import threading
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                                QTextEdit, QListWidget, QListWidgetItem, QLabel, 
                                QFileDialog, QSplitter)
@@ -26,8 +27,8 @@ class ChatWidget(QWidget):
         self.setLayout(main_layout)
         
         # 创建分割器
-        splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(splitter)
+        self.splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(self.splitter)
         
         # 聊天区域
         chat_container = QWidget()
@@ -39,23 +40,33 @@ class ChatWidget(QWidget):
         self.message_list.setSpacing(10)
         chat_layout.addWidget(self.message_list)
         
-        # 输入区域
+        # 输入区域 - 限制高度
         input_container = QWidget()
+        input_container.setMaximumHeight(120)  # 限制输入区域最大高度
         input_layout = QHBoxLayout(input_container)
+        input_layout.setContentsMargins(5, 5, 5, 5)  # 减少边距，使界面更紧凑
+        
+        # 文件选择区域 - 垂直布局
+        file_select_container = QWidget()
+        file_select_layout = QVBoxLayout(file_select_container)
         
         # 文件选择按钮
         self.file_btn = QPushButton("选择文件")
         self.file_btn.clicked.connect(self.select_file)
-        input_layout.addWidget(self.file_btn)
+        file_select_layout.addWidget(self.file_btn)
         
         # 文件标签
         self.file_label = QLabel("未选择文件")
-        input_layout.addWidget(self.file_label)
+        self.file_label.setAlignment(Qt.AlignCenter)
+        file_select_layout.addWidget(self.file_label)
+        
+        # 将文件选择区域添加到水平布局中
+        input_layout.addWidget(file_select_container)
         
         # 输入框
         self.input_text = QTextEdit()
         self.input_text.setPlaceholderText("请输入消息...")
-        self.input_text.setMaximumHeight(100)
+        self.input_text.setMaximumHeight(80)  # 限制输入框的高度
         input_layout.addWidget(self.input_text)
         
         # 发送按钮
@@ -70,11 +81,11 @@ class ChatWidget(QWidget):
         chat_layout.addWidget(self.param_widget)
         self.param_widget.hide()  # 默认隐藏参数区域
         
-        splitter.addWidget(chat_container)
+        self.splitter.addWidget(chat_container)
         
         # 侧边栏
         self.sidebar = SidebarWidget()
-        splitter.addWidget(self.sidebar)
+        self.splitter.addWidget(self.sidebar)
         self.sidebar.hide()  # 默认隐藏侧边栏
         
         # 添加侧边栏切换按钮
@@ -84,8 +95,12 @@ class ChatWidget(QWidget):
         chat_layout.addWidget(self.sidebar_btn)
         chat_layout.setAlignment(self.sidebar_btn, Qt.AlignRight | Qt.AlignTop)
         
+        # 设置消息列表占据大部分空间
+        chat_layout.setStretchFactor(self.message_list, 4)
+        chat_layout.setStretchFactor(input_container, 1)
+        
         # 设置分割器默认比例
-        splitter.setSizes([700, 0])  # 初始状态下侧边栏宽度为0
+        self.splitter.setSizes([self.width(), 0])  # 初始状态下侧边栏宽度为0
     
     def connect_signals(self):
         """连接信号和槽"""
@@ -144,8 +159,19 @@ class ChatWidget(QWidget):
         self.message_list.setItemWidget(thinking_list_item, thinking_item)
         self.message_list.scrollToBottom()
         
-        # 异步发送消息到ChatRobot
-        self.chat_robot.ChatFrame(message_text)
+        # 在新线程中处理消息
+        threading.Thread(target=self._process_message_in_thread, 
+                        args=(message_text,), daemon=True).start()
+    
+    def _process_message_in_thread(self, message_text):
+        """在新线程中处理消息"""
+        try:
+            # 异步发送消息到ChatRobot
+            self.chat_robot.ChatFrame(message_text)
+            # 注意：不需要在这里更新UI，因为ChatRobot会通过信号触发UI更新
+        except Exception as e:
+            print(f"处理消息时发生错误: {e}")
+            # 这里可以考虑发送错误信号到UI线程
     
     @Slot(str)
     def handle_response(self, response):
@@ -203,8 +229,18 @@ class ChatWidget(QWidget):
     def toggle_sidebar(self):
         """切换侧边栏显示状态"""
         if self.sidebar.isVisible():
+            # 隐藏侧边栏
             self.sidebar.hide()
             self.sidebar_btn.setText("➡️")
+            # 重置分割器尺寸，聊天区域占满
+            self.splitter.setSizes([self.width(), 0])
         else:
+            # 显示侧边栏，并设置合适的宽度
             self.sidebar.show()
             self.sidebar_btn.setText("⬅️")
+            
+            # 设置合理的尺寸比例，例如聊天区域:侧边栏 = 2:1
+            total_width = self.splitter.width()
+            chat_width = int(total_width * 0.65)
+            sidebar_width = total_width - chat_width
+            self.splitter.setSizes([chat_width, sidebar_width])
