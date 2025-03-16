@@ -13,12 +13,14 @@
             {
                 "name": "weight_path",
                 "description": "YOLO权重路径",
-                "required": false
+                "required": false,
+                "default": ".//weights//YOLO_World//yolov8s-worldv2.pt"
             },
             {
                 "name": "is_show",
                 "description": "是否显示检测结果",
-                "required": false
+                "required": false,
+                "default": false
             }
         ]
     },
@@ -35,13 +37,15 @@
             },
             {
                 "name": "weight_path",
-                "description": "YOLO权重路径",
-                "required": false
+                "description": "YOLO权重路径，文件类型为.pt",
+                "required": false,
+                "default": "tasks/weights/yolov5s.pt"
             },
             {
                 "name": "is_show",
                 "description": "是否显示检测结果",
-                "required": false
+                "required": false,
+                "default": true
             }
         ]
     },
@@ -58,8 +62,9 @@
             },
             {
                 "name": "weight_path",
-                "description": "BLIP权重路径",
-                "required": false
+                "description": "BLIP权重路径，文件类型为.pt",
+                "required": false,
+                "default": "tasks/weights/blip.pt"
             }
         ]
     }

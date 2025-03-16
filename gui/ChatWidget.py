@@ -105,7 +105,6 @@ class ChatWidget(QWidget):
     def connect_signals(self):
         """连接信号和槽"""
         # 连接ChatRobot的信号
-        self.chat_robot.response_ready.connect(self.handle_response)
         self.chat_robot.parameters_needed.connect(self.show_parameter_form)
         self.chat_robot.processing_task.connect(self.show_processing_status)
         self.chat_robot.task_completed.connect(self.show_task_result)
@@ -124,6 +123,16 @@ class ChatWidget(QWidget):
             filename = file_path.split("/")[-1]
             self.file_label.setText(f"已选择: {filename}")
     
+    def add_message_to_list(self, text, image_path="", is_user=True):
+        """向消息列表中添加一条消息并返回列表项"""
+        message_item = MessageItem(text, image_path, is_user=is_user)
+        list_item = QListWidgetItem(self.message_list)
+        list_item.setSizeHint(message_item.sizeHint())
+        self.message_list.addItem(list_item)
+        self.message_list.setItemWidget(list_item, message_item)
+        self.message_list.scrollToBottom()
+        return list_item
+    
     def send_message(self):
         """发送消息"""
         message_text = self.input_text.toPlainText().strip()
@@ -131,11 +140,7 @@ class ChatWidget(QWidget):
             return
         
         # 添加用户消息到列表
-        user_item = MessageItem(message_text, self.selected_file_path, is_user=True)
-        list_item = QListWidgetItem(self.message_list)
-        list_item.setSizeHint(user_item.sizeHint())
-        self.message_list.addItem(list_item)
-        self.message_list.setItemWidget(list_item, user_item)
+        self.add_message_to_list(message_text, self.selected_file_path, is_user=True)
         
         # 如果有选择文件，将文件路径添加到消息
         if self.selected_file_path:
@@ -152,15 +157,7 @@ class ChatWidget(QWidget):
         self.file_label.setText("未选择文件")
         
         # 添加AI思考中的消息
-        thinking_item = MessageItem("思考中...", "", is_user=False)
-        thinking_list_item = QListWidgetItem(self.message_list)
-        thinking_list_item.setSizeHint(thinking_item.sizeHint())
-        self.message_list.addItem(thinking_list_item)
-        self.message_list.setItemWidget(thinking_list_item, thinking_item)
-        self.message_list.scrollToBottom()
-        
-        # 保存当前消息项引用，以便在流式更新中修改
-        self.current_response_item = thinking_list_item
+        self.current_response_item = self.add_message_to_list("思考中...", "", is_user=False)
         self.current_response_content = ""
         
         # 在新线程中处理消息
@@ -174,17 +171,10 @@ class ChatWidget(QWidget):
             self.chat_robot.ChatFrame(message_text)
             # 注意：不需要在这里更新UI，因为ChatRobot会通过信号触发UI更新
         except Exception as e:
-            print(f"处理消息时发生错误: {e}")
-            self.handle_response("抱歉，处理消息时发生错误，请重试！")
-            # 这里可以考虑发送错误信号到UI线程
+            error_message = f"处理消息时发生错误: {e}"
+            # 发送错误信号到信息列表
+            self.add_message_to_list(error_message)
             
-    
-    @Slot(str)
-    def handle_response(self, response):
-        """处理AI回复完成后的最终处理"""
-        # 完整回复已经通过流式更新完成，无需再更新UI
-        # 但可以在这里做一些收尾工作
-        pass
     
     @Slot(str)
     def update_stream_content(self, content):

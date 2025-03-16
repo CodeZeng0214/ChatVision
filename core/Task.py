@@ -29,3 +29,18 @@ class Task:
                 parameter_description.append(f"{parameter['name']} (unnecessary): {parameter['description']}")
         parameter_description = '\n'.join(parameter_description)
         return f"-- {self.task_name}: {self.description},\nparameters: \n{parameter_description}"
+    
+    def get_parameter_default(self, param_name):
+        """获取参数的默认值"""
+        for param in self.parameters:
+            if param["name"] == param_name:
+                return param.get("default", None)
+        return None
+    
+    def set_parameter_default(self, param_name, value):
+        """设置参数的默认值"""
+        for param in self.parameters:
+            if param["name"] == param_name:
+                param["default"] = value
+                return True
+        return False
