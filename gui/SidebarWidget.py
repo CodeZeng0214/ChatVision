@@ -54,3 +54,4 @@ class SidebarWidget(QWidget):
         pixmap = QPixmap(image_path)
         scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.processed_image.setPixmap(scaled_pixmap)
+    

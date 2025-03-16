@@ -89,14 +89,14 @@ class ChatWidget(QWidget):
         self.sidebar.hide()  # 默认隐藏侧边栏
         
         # 添加侧边栏切换按钮
-        self.sidebar_btn = QPushButton("➡️")
-        self.sidebar_btn.setFixedSize(30, 30)
-        self.sidebar_btn.clicked.connect(self.toggle_sidebar)
+        self.sidebar_btn = QPushButton("⬅️打开侧边栏")
+        #self.sidebar_btn.setFixedSize(30, 30)
+        self.sidebar_btn.clicked.connect(self.toggleSidebar)
         chat_layout.addWidget(self.sidebar_btn)
         chat_layout.setAlignment(self.sidebar_btn, Qt.AlignRight | Qt.AlignTop)
         
         # 设置消息列表占据大部分空间
-        chat_layout.setStretchFactor(self.message_list, 4)
+        chat_layout.setStretchFactor(self.message_list, 5)
         chat_layout.setStretchFactor(input_container, 1)
         
         # 设置分割器默认比例
@@ -109,6 +109,7 @@ class ChatWidget(QWidget):
         self.chat_robot.parameters_needed.connect(self.show_parameter_form)
         self.chat_robot.processing_task.connect(self.show_processing_status)
         self.chat_robot.task_completed.connect(self.show_task_result)
+        self.chat_robot.stream_content.connect(self.update_stream_content)
         
         # 连接参数表单的信号
         self.param_widget.parameters_ready.connect(self.handle_parameters)
@@ -142,8 +143,7 @@ class ChatWidget(QWidget):
             # 设置原始图片到侧边栏
             self.sidebar.set_original_image(self.selected_file_path)
             # 显示侧边栏
-            self.sidebar.show()
-            self.sidebar_btn.setText("⬅️")
+            self.showSidebar()
         
         # 清空输入框和文件选择
         self.input_text.clear()
@@ -159,6 +159,10 @@ class ChatWidget(QWidget):
         self.message_list.setItemWidget(thinking_list_item, thinking_item)
         self.message_list.scrollToBottom()
         
+        # 保存当前消息项引用，以便在流式更新中修改
+        self.current_response_item = thinking_list_item
+        self.current_response_content = ""
+        
         # 在新线程中处理消息
         threading.Thread(target=self._process_message_in_thread, 
                         args=(message_text,), daemon=True).start()
@@ -171,20 +175,26 @@ class ChatWidget(QWidget):
             # 注意：不需要在这里更新UI，因为ChatRobot会通过信号触发UI更新
         except Exception as e:
             print(f"处理消息时发生错误: {e}")
+            self.handle_response("抱歉，处理消息时发生错误，请重试！")
             # 这里可以考虑发送错误信号到UI线程
     
     @Slot(str)
     def handle_response(self, response):
-        """处理AI回复"""
-        # 移除思考中的消息
-        self.message_list.takeItem(self.message_list.count() - 1)
+        """处理AI回复完成后的最终处理"""
+        # 完整回复已经通过流式更新完成，无需再更新UI
+        # 但可以在这里做一些收尾工作
+        pass
+    
+    @Slot(str)
+    def update_stream_content(self, content):
+        """更新流式内容到聊天窗口"""
+        # 追加内容到当前回复
+        self.current_response_content += content
         
-        # 添加AI回复消息
-        ai_item = MessageItem(response, "", is_user=False)
-        list_item = QListWidgetItem(self.message_list)
-        list_item.setSizeHint(ai_item.sizeHint())
-        self.message_list.addItem(list_item)
-        self.message_list.setItemWidget(list_item, ai_item)
+        # 更新UI中的消息
+        ai_item = MessageItem(self.current_response_content, "", is_user=False)
+        self.current_response_item.setSizeHint(ai_item.sizeHint())
+        self.message_list.setItemWidget(self.current_response_item, ai_item)
         
         # 滚动到底部
         self.message_list.scrollToBottom()
@@ -209,8 +219,7 @@ class ChatWidget(QWidget):
     def show_task_result(self, task_type, image_path):
         """显示任务处理结果"""
         # 显示侧边栏
-        self.sidebar.show()
-        self.sidebar_btn.setText("⬅️")
+        self.showSidebar()
         
         # 设置原始图片
         self.sidebar.set_original_image(image_path)
@@ -226,21 +235,27 @@ class ChatWidget(QWidget):
         """处理用户填写的参数并继续任务"""
         self.chat_robot.set_parameters(parameters)
     
-    def toggle_sidebar(self):
-        """切换侧边栏显示状态"""
+    def toggleSidebar(self):
+        """按钮切换侧边栏显示状态"""
         if self.sidebar.isVisible():
-            # 隐藏侧边栏
-            self.sidebar.hide()
-            self.sidebar_btn.setText("➡️")
-            # 重置分割器尺寸，聊天区域占满
-            self.splitter.setSizes([self.width(), 0])
+            self.closeSidebar()
         else:
             # 显示侧边栏，并设置合适的宽度
-            self.sidebar.show()
-            self.sidebar_btn.setText("⬅️")
-            
-            # 设置合理的尺寸比例，例如聊天区域:侧边栏 = 2:1
-            total_width = self.splitter.width()
-            chat_width = int(total_width * 0.65)
-            sidebar_width = total_width - chat_width
-            self.splitter.setSizes([chat_width, sidebar_width])
+            self.showSidebar()
+    
+    def showSidebar(self):
+        """"显示侧边栏, 并设置合适的宽度"""
+        self.sidebar.show()
+        self.sidebar_btn.setText("➡️关闭侧边栏")
+        
+        # 设置合理的尺寸比例，例如聊天区域:侧边栏 = 2:1
+        chat_width = int(self.splitter.width() * 0.65)
+        sidebar_width = self.splitter.width() - chat_width
+        self.splitter.setSizes([chat_width, sidebar_width])
+        
+    def closeSidebar(self):
+        """隐藏侧边栏"""
+        self.sidebar.hide()
+        self.sidebar_btn.setText("⬅️打开侧边栏")
+        # 重置分割器尺寸，聊天区域占满
+        self.splitter.setSizes([self.width(), 0])

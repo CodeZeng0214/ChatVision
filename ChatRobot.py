@@ -34,6 +34,7 @@ class ChatRobot(QObject):
     parameters_needed = Signal(list) if HAS_PYSIDE else None  # 需要参数时的信号
     processing_task = Signal(str) if HAS_PYSIDE else None  # 处理任务时的信号
     task_completed = Signal(str, str) if HAS_PYSIDE else None  # 任务完成时的信号
+    stream_content = Signal(str) if HAS_PYSIDE else None  # 流式内容更新信号
 
     def __init__(self, chat_inter=ChatGPT(), init_message="你是一个能够进行图像识别的聊天机器人."):
         """
@@ -105,7 +106,9 @@ class ChatRobot(QObject):
             if task_info == "General": 
                 if HAS_PYSIDE:
                     self.processing_task.emit("正在思考...")
-                response = self.chat_inter.StreamResponse(self.messages)
+                # 使用回调函数处理流式内容
+                response = self.chat_inter.StreamResponse(self.messages, 
+                                                         self._stream_callback if HAS_PYSIDE else None)
                 self.messages.append({"role": "assistant", "content": response})
                 if HAS_PYSIDE:
                     self.response_ready.emit(response)
@@ -158,7 +161,7 @@ class ChatRobot(QObject):
             result_summary = f"任务类型：{task_type}\n任务结果：{task_results}"
             response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
                                         + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                        + question}])
+                                        + question}], self._stream_callback if HAS_PYSIDE else None)
             self.messages.append({"role": "assistant", "content": response})
             if HAS_PYSIDE:
                 self.response_ready.emit(response)
@@ -221,6 +224,11 @@ class ChatRobot(QObject):
         else:
             return task_info  # 假设 GPT 返回 Python 字典格式
     
+    def _stream_callback(self, content):
+        """处理流式内容的回调函数"""
+        if HAS_PYSIDE:
+            self.stream_content.emit(content)
+    
     def set_parameters(self, parameters):
         """设置参数并继续执行任务"""
         if not self.waiting_for_params or not self.current_task:
@@ -243,7 +251,7 @@ class ChatRobot(QObject):
         result_summary = f"任务类型：{self.current_task}\n任务结果：{task_results}"
         response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
                                     + "\n请你根据用户的问题内容，提取或者统计以上任务执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                    + last_question}])
+                                    + last_question}], self._stream_callback if HAS_PYSIDE else None)
         
         self.messages.append({"role": "assistant", "content": response})
         self.response_ready.emit(response) if HAS_PYSIDE else None
@@ -259,10 +267,10 @@ if __name__ == '__main__':
         
     chat_robot = ChatRobot()
     
-    print("开始对话（输入'退出'或'q'以结束）：")
+    print("开始对话（输入'exit'或'q'以结束）：")
     while True:
         user_input = input("你: ")
-        if user_input.lower() == '退出' or user_input.lower() == 'q':
+        if user_input.lower() == 'exit' or user_input.lower() == 'q':
             break
         print("ChatIR:", end='')
         chat_robot.ChatFrame(question=user_input)
