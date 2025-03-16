@@ -25,7 +25,7 @@ class MessageItem(QWidget):
         )
         
         # 用户名标签
-        name_label = QLabel("ChatIR" if not self.is_user else "你")
+        name_label = QLabel("ChatCV" if not self.is_user else "你")
         name_label.setStyleSheet("font-weight: bold; color: #333;")
         message_layout.addWidget(name_label)
         

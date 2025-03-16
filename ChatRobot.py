@@ -6,8 +6,9 @@
 ### 2025.03.15 添加多线程支持，避免界面卡顿
 
 ### ========== 导入辅助模块 ========== ###
-from ChatInter import ChatGPT # 导入ChatGPT聊天接口
-from TasksManager import TasksManager # 导入任务管理器
+from core.ChatInter import ChatGPT # 导入ChatGPT聊天接口
+from core.TasksManager import TasksManager # 导入任务管理器
+from core.Task import Task # 导入任务基类
 
 # 条件导入PySide6，当此脚本不是启动脚本时导入
 if __name__ != '__main__':
@@ -21,11 +22,7 @@ else:
     class Signal:
         def __init__(self, *args): pass
         def emit(self, *args): pass
-    
-### ========== 导入任务模块 ========== ###
-from tasks.YOLOTasks import ObjDetect, HummanPoseTrack  # YOLO 图像检测和人类姿态估计模块 ObjDetect HummanPoseTrack
-# from tasks.YOLODeepsort.YOLO_Deepsort import PedCarTrack # 行人车辆跟踪模块 PedCarTrack
-# from tasks.BLIPTasks import ImgDescription
+
     
 ### ========== 聊天机器人类 ========== ###
 class ChatRobot(QObject):
@@ -50,41 +47,7 @@ class ChatRobot(QObject):
         self.task_manager = TasksManager() # 实例化一个任务管理器
         self.current_task = None  # 当前处理的任务
         self.waiting_for_params = False  # 是否等待参数
-        self._RegisterTasks()
 
-    def _RegisterTasks(self):
-        """注册任务"""
-        self.task_manager.register_task(
-            "ObjectDetect",
-            ObjDetect,
-            "检测图像中的物体或人物，可以计数",
-             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
-             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
-             {"name": "is_show", "description": "是否需要在屏幕上显示结果", "required": False}]
-        )
-        self.task_manager.register_task(
-            "HumanPoseEstimate", 
-            HummanPoseTrack, 
-            "只能估计人体姿态，不能计数",
-             [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
-             {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}, 
-             {"name": "is_show", "description": "是否需要在屏幕上显示结果", "required": False}]
-        )
-        # self.task_manager.register_task(
-        #     "PedestrianAndVehicleTracking", 
-        #     PedCarTrack, 
-        #     "跟踪行人和车辆",
-        #      [{"name": "image_path", "description": "图像或视频文件的路径", "required": True}, 
-        #      {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False},
-        #      {"name": "save_path", "description": "任务结果文件的存储路径", "required": False}]
-        # )
-        # self.task_manager.register_task(
-        #     "ImageDescription", 
-        #     ImgDescription, 
-        #     "可以用一句话描述图像内容",
-        #      [{"name": "image_path", "description": "图像文件的路径", "required": True}, 
-        #      {"name": "weight_path", "description": "任务使用的模型权重路径", "required": False}]
-        # )
 
     # 主框架
     def ChatFrame(self, question):
@@ -97,7 +60,7 @@ class ChatRobot(QObject):
             self.messages.append({"role": "user", "content": question})
 
             # 告知 语言大模型 支持的任务的 提示模板
-            task_descriptions = self.task_manager.DescribeTasks()
+            task_descriptions = self.task_manager.describeTasks()
 
             # 使用 语言大模型 分析用户输入意图
             task_info = self._AnalyInput(question, task_descriptions)
@@ -110,8 +73,8 @@ class ChatRobot(QObject):
                 response = self.chat_inter.StreamResponse(self.messages, 
                                                          self._stream_callback if HAS_PYSIDE else None)
                 self.messages.append({"role": "assistant", "content": response})
-                if HAS_PYSIDE:
-                    self.response_ready.emit(response)
+                # if HAS_PYSIDE:
+                #     self.response_ready.emit(response)
                 return response
                 
             # 获取任务名称和参数
@@ -119,14 +82,14 @@ class ChatRobot(QObject):
             task_params = task_info['parameters']
             
             # 检查是否缺少必要参数
-            task_def = self.task_manager.GetTask(task_type)
-            if not task_def:
+            task = self.task_manager.GetTask(task_type)
+            if not task:
                 response = f"未知任务类型：{task_type}"
                 if HAS_PYSIDE:
                     self.response_ready.emit(response)
                 return response
                 
-            required_params = [p for p in task_def["parameters"] if p.get("required", False)]
+            required_params = [p for p in task.parameters if p.get("required", False)]
             missing_params = []
             
             for param in required_params:
@@ -144,7 +107,7 @@ class ChatRobot(QObject):
                 return missing_message
                 
             # 查找并执行任务
-            task_callable = task_def["callable"]
+            task_callable = task.calltask
             
             # 通知GUI任务开始处理
             if HAS_PYSIDE:
@@ -234,13 +197,13 @@ class ChatRobot(QObject):
         if not self.waiting_for_params or not self.current_task:
             return False
             
-        task_def = self.task_manager.GetTask(self.current_task)
-        if not task_def:
+        task = self.task_manager.GetTask(self.current_task)
+        if not task:
             return False
             
         # 执行任务
         self.processing_task.emit(f"正在执行{self.current_task}任务...") if HAS_PYSIDE else None
-        task_results = task_def["callable"](parameters)
+        task_results = task.calltask(parameters)
         
         # 通知任务已完成
         if "image_path" in parameters:
@@ -272,6 +235,6 @@ if __name__ == '__main__':
         user_input = input("你: ")
         if user_input.lower() == 'exit' or user_input.lower() == 'q':
             break
-        print("ChatIR:", end='')
+        print("ChatCV:", end='')
         chat_robot.ChatFrame(question=user_input)
         print('')

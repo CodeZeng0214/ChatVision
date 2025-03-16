@@ -1,10 +1,12 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QPushButton, QListWidget, QListWidgetItem,
-                               QGroupBox, QFormLayout, QLineEdit, QCheckBox)
+                               QGroupBox, QFormLayout, QLineEdit, QCheckBox,
+                               QMessageBox)
 from PySide6.QtCore import Qt, QTimer
 
 from ChatRobot import ChatRobot
-from TasksManager import TasksManager
+from core.TasksManager import TasksManager
+from core.Task import Task
 
 class PluginManagerWidget(QWidget):
     """插件管理界面"""
@@ -73,8 +75,11 @@ class PluginManagerWidget(QWidget):
         # 获取所有已注册的任务
         tasks = self.chat_robot.task_manager.tasks
         
-        for task_name in tasks:
+        for task_name, task in tasks.items():
             item = QListWidgetItem(task_name)
+            # 根据任务启用状态设置颜色
+            if not task.enable:
+                item.setForeground(Qt.gray)
             self.plugin_list.addItem(item)
     
     def show_plugin_details(self, row):
@@ -83,9 +88,10 @@ class PluginManagerWidget(QWidget):
             return
         
         task_name = self.plugin_list.item(row).text()
-        task_info = self.chat_robot.task_manager.tasks.get(task_name)
+        # 获取任务实例 (现在是Task对象，不是字典)
+        task : Task = self.chat_robot.task_manager.tasks.get(task_name)
         
-        if not task_info:
+        if not task:
             return
         
         self.detail_label.setText(f"插件: {task_name}")
@@ -95,48 +101,64 @@ class PluginManagerWidget(QWidget):
             self.form_layout.removeRow(0)
         
         # 添加描述
-        desc_label = QLabel(task_info["description"])
+        desc_label = QLabel(task.description)
         desc_label.setWordWrap(True)
         self.form_layout.addRow(QLabel("描述:"), desc_label)
         
         # 添加参数设置字段
-        for param in task_info["parameters"]:
-            name = param["name"]
-            description = param["description"]
-            
-            if "path" in name.lower():
-                field = QLineEdit()
-                field.setPlaceholderText(f"默认路径: {description}")
-                self.form_layout.addRow(f"{name}:", field)
-            elif "is_" in name.lower():
-                field = QCheckBox()
-                field.setToolTip(description)
-                self.form_layout.addRow(f"{name}:", field)
+        for param in task.parameters: 
+            # （'可选'的参数才能进行配置）
+            if param.get("required", True) is False:
+                name = param["name"]
+                description = param["description"]
+                
+                if "path" in name.lower():
+                    field = QLineEdit()
+                    field.setPlaceholderText(f"默认路径: {description}")
+                    self.form_layout.addRow(f"{name}:", field)
+                elif "is_" in name.lower():
+                    field = QCheckBox()
+                    field.setToolTip(description)
+                    self.form_layout.addRow(f"{name}:", field)
         
         # 显示设置区域和按钮
         self.settings_form.show()
         self.toggle_btn.show()
         self.save_btn.show()
+        
+        # 根据任务启用状态更新按钮文本
+        if task.enable:
+            self.toggle_btn.setText("禁用插件")
+        else:
+            self.toggle_btn.setText("启用插件")
     
     def toggle_plugin(self):
         """启用/禁用插件"""
         current_row = self.plugin_list.currentRow()
         if current_row >= 0:
             item = self.plugin_list.item(current_row)
-            # 简单地通过字体颜色表示启用/禁用状态
-            if item.foreground().color().name() == "#808080":  # 灰色(禁用)
-                item.setForeground(Qt.black)  # 启用(黑色)
-                self.toggle_btn.setText("禁用插件")
-            else:
-                item.setForeground(Qt.gray)  # 禁用(灰色)
-                self.toggle_btn.setText("启用插件")
+            task_name = item.text()
+            
+            # 切换任务的启用状态
+            if self.chat_robot.task_manager.toggle_task(task_name):
+                task = self.chat_robot.task_manager.tasks.get(task_name)
+                if task.enable:
+                    item.setForeground(Qt.black)  # 启用(黑色)
+                    self.toggle_btn.setText("禁用插件")
+                else:
+                    item.setForeground(Qt.gray)  # 禁用(灰色)
+                    self.toggle_btn.setText("启用插件")
     
     def save_plugin_settings(self):
         """保存插件设置"""
-        # 这里只是示意，实际需要保存到配置文件
-        self.save_btn.setText("设置已保存!")
-        # 恢复按钮文字
-        QTimer.singleShot(2000, lambda: self.save_btn.setText("保存设置"))
+        # 实际保存到配置文件
+        try:
+            self.chat_robot.task_manager.save_settings()
+            self.save_btn.setText("设置已保存!")
+            # 恢复按钮文字
+            QTimer.singleShot(2000, lambda: self.save_btn.setText("保存设置"))
+        except Exception as e:
+            QMessageBox.warning(self, "保存失败", f"保存设置时发生错误: {e}")
     
     def import_plugin(self):
         """导入外部插件"""

@@ -177,6 +177,7 @@ class ChatWidget(QWidget):
             print(f"处理消息时发生错误: {e}")
             self.handle_response("抱歉，处理消息时发生错误，请重试！")
             # 这里可以考虑发送错误信号到UI线程
+            
     
     @Slot(str)
     def handle_response(self, response):
