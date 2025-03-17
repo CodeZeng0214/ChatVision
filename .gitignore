@@ -34,3 +34,9 @@
 /gui/__pycache__
 /tasks/YOLODeepsort/__pycache__
 /core/__pycache__
+/plugins/YOLODeepsort/deep_sort/deep_sort/sort/__pycache__
+/plugins/__pycache__
+/plugins/YOLODeepsort/__pycache__
+/plugins/YOLODeepsort/deep_sort/deep_sort/__pycache__
+/plugins/YOLODeepsort/deep_sort/deep_sort/deep/__pycache__
+/plugins/YOLODeepsort/deep_sort/utils/__pycache__

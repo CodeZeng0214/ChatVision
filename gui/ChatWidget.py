@@ -106,8 +106,8 @@ class ChatWidget(QWidget):
         """连接信号和槽"""
         # 连接ChatRobot的信号
         self.chat_robot.parameters_needed.connect(self.show_parameter_form)
-        self.chat_robot.processing_task.connect(self.show_processing_status)
-        self.chat_robot.task_completed.connect(self.show_task_result)
+        self.chat_robot.processing_plugin.connect(self.show_processing_status)
+        self.chat_robot.plugin_completed.connect(self.show_plugin_result)
         self.chat_robot.stream_content.connect(self.update_stream_content)
         
         # 连接参数表单的信号
@@ -164,10 +164,6 @@ class ChatWidget(QWidget):
         threading.Thread(target=self._process_message_in_thread, 
                         args=(message_text,), daemon=True).start()
         
-    def getTaskmanager(self):
-        """获取聊天机器人的任务管理器"""
-        return self.chat_robot.task_manager
-    
     def _process_message_in_thread(self, message_text):
         """在新线程中处理消息"""
         try:
@@ -201,7 +197,7 @@ class ChatWidget(QWidget):
     
     @Slot(str)
     def show_processing_status(self, status):
-        """显示任务处理状态"""
+        """显示插件处理状态"""
         # 更新最后一条消息为处理状态
         if self.message_list.count() > 0:
             last_item = self.message_list.item(self.message_list.count() - 1)
@@ -211,15 +207,15 @@ class ChatWidget(QWidget):
                 self.message_list.setItemWidget(last_item, new_item)
     
     @Slot(str, str)
-    def show_task_result(self, task_type, image_path):
-        """显示任务处理结果"""
+    def show_plugin_result(self, plugin_type, image_path):
+        """显示插件处理结果"""
         # 显示侧边栏
         self.showSidebar()
         
         # 设置原始图片
         self.sidebar.set_original_image(image_path)
         
-        # 根据任务类型，可能还需要设置处理后的图片
+        # 根据插件类型，可能还需要设置处理后的图片
         # 这里需要根据实际情况获取处理后图片路径
         processed_path = image_path.replace(".jpg", "_processed.jpg")
         if os.path.exists(processed_path):
@@ -254,3 +250,7 @@ class ChatWidget(QWidget):
         self.sidebar_btn.setText("⬅️打开侧边栏")
         # 重置分割器尺寸，聊天区域占满
         self.splitter.setSizes([self.width(), 0])
+    
+    def getPluginManager(self):
+        """获取聊天机器人的插件管理器"""
+        return self.chat_robot.plugin_manager
