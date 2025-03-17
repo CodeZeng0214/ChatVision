@@ -5,31 +5,29 @@ from copy import deepcopy
 class PluginListWidgetItem(QListWidgetItem):
     """表示插件列表中的一个项目"""
     
-    def __init__(self, plugin_name, config=None, is_loaded=True, is_enabled=True):
+    def __init__(self, plugin_name, plugin_config=None):
         """
         初始化插件列表项
         
         参数:
             plugin_name (str): 插件名称
             config (dict): 插件配置
-            is_loaded (bool): 是否已加载
-            is_enabled (bool): 是否已启用
         """
         super().__init__(plugin_name)
         self.plugin_name = plugin_name
-        self.is_loaded = is_loaded
-        self.is_enabled = is_enabled
-        self._config = config or {}
+        self.is_load = plugin_config.get('is_load', True)
+        self.enable = plugin_config.get('enable', True)
+        self._config = plugin_config or {}
         self._pending_changes = {}  # 存储未保存的修改
         self.update_appearance()
     
     def update_appearance(self):
         """根据加载和启用状态更新外观"""
-        if not self.is_loaded:
+        if not self.is_load:
             # 未加载的插件显示为浅灰色
             self.setForeground(Qt.lightGray)
             self.setToolTip("未加载")
-        elif not self.is_enabled:
+        elif not self.enable:
             # 已加载但未启用的插件显示为灰色
             self.setForeground(Qt.gray)
             self.setToolTip("已加载但未启用")
@@ -40,10 +38,10 @@ class PluginListWidgetItem(QListWidgetItem):
     
     def set_loaded(self, is_loaded):
         """设置加载状态"""
-        self.is_loaded = is_loaded
+        self.is_load = is_loaded
         # 如果未加载，则必定未启用
         if not is_loaded:
-            self.is_enabled = False
+            self.enable = False
         self.update_appearance()
         self._pending_changes['is_load'] = is_loaded
         if not is_loaded:
@@ -51,11 +49,11 @@ class PluginListWidgetItem(QListWidgetItem):
     
     def set_enabled(self, is_enabled):
         """设置启用状态（只有已加载的插件才能被启用）"""
-        if self.is_loaded:
-            self.is_enabled = is_enabled
+        if self.is_load:
+            self.enable = is_enabled
             self._pending_changes['enable'] = is_enabled
         else:
-            self.is_enabled = False
+            self.enable = False
             self._pending_changes['enable'] = False
         self.update_appearance()
     
@@ -119,7 +117,7 @@ class PluginListWidgetItem(QListWidgetItem):
             config (dict): 新的插件配置
         """
         self._config = deepcopy(config)
-        self.is_loaded = config.get('is_load', True)
-        self.is_enabled = config.get('enable', True)
+        self.is_load = config.get('is_load', True)
+        self.enable = config.get('enable', True)
         self.update_appearance()
         self.clear_pending_changes()

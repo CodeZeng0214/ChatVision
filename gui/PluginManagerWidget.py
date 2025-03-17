@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QTimer
 import json
 import os
 
-from ChatRobot import ChatRobot
+from core.PluginManager import PluginManager
 from core.AuxiliaryFunction import PathCheck
 from gui.PluginListWidgetItem import PluginListWidgetItem
 from gui.PluginDetailWidget import PluginDetailWidget
@@ -13,10 +13,9 @@ from gui.PluginDetailWidget import PluginDetailWidget
 class PluginManagerWidget(QWidget):
     """插件管理界面"""
     
-    def __init__(self, chat_robot: ChatRobot):
+    def __init__(self, plugin_manager: PluginManager):
         super().__init__()
-        self.chat_robot = chat_robot
-        self.plugin_manager = chat_robot.plugin_manager
+        self.plugin_manager = plugin_manager
         self.plugin_items = {}  # 存储所有插件项的引用
         self.setup_ui()
         self.load_plugins()
@@ -61,25 +60,17 @@ class PluginManagerWidget(QWidget):
         main_layout.addWidget(self.detail_widget, 2)  # 右侧占比较大
     
     def load_plugins(self):
-        """加载所有已注册的插件"""
+        """初始化并加载所有已注册的插件"""
         self.plugin_list.clear()
         self.plugin_items.clear()
         
-        # 获取配置文件中的所有插件
-        all_plugins = self.plugin_manager.all_plugins_config
-        loaded_plugins = self.chat_robot.plugin_manager.plugins
-        
-        for plugin_name, plugin_config in all_plugins.items():
-            # 获取插件状态
-            is_loaded = plugin_config.get('is_load', True)
-            is_enabled = plugin_config.get('enable', True)
-            
-            # 如果插件已加载，则使用实际状态
-            if plugin_name in loaded_plugins:
-                is_enabled = loaded_plugins[plugin_name].enable
+        # 获取插件管理器中的插件和所有的插件配置
+        all_plugins_config = self.plugin_manager.all_plugins_config
+
+        for plugin_name, plugin_config in all_plugins_config.items():
             
             # 创建并添加插件列表项
-            item = PluginListWidgetItem(plugin_name, plugin_config, is_loaded, is_enabled)
+            item = PluginListWidgetItem(plugin_name, plugin_config)
             self.plugin_list.addItem(item)
             self.plugin_items[plugin_name] = item
         
@@ -87,14 +78,14 @@ class PluginManagerWidget(QWidget):
         if self.plugin_list.count() > 0:
             self.plugin_list.setCurrentRow(0)
     
-    def on_plugin_selected(self, current, previous):
-        """处理插件选择变更"""
-        if not current:
+    def on_plugin_selected(self, current_item, previous):
+        """处理插件列表选择时的详情界面变更"""
+        if not current_item:
             self.detail_widget.clear()
             return
             
-        if isinstance(current, PluginListWidgetItem):
-            self.detail_widget.display_plugin(current)
+        if isinstance(current_item, PluginListWidgetItem):
+            self.detail_widget.display_plugin(current_item)
             
             # 检查是否有未保存的修改来更新保存按钮状态
             self.update_save_button()
@@ -167,7 +158,7 @@ class PluginManagerWidget(QWidget):
             for plugin_name, item in self.plugin_items.items():
                 if item.has_pending_changes():
                     changes = item.get_pending_changes()
-                    plugin = self.chat_robot.plugin_manager.plugins.get(plugin_name)
+                    plugin = self.plugin_manager.plugins.get(plugin_name)
                     
                     if plugin:
                         # 更新插件对象属性
@@ -196,7 +187,7 @@ class PluginManagerWidget(QWidget):
     
     def read_config_file(self):
         """从配置文件读取插件配置"""
-        config_path = self.chat_robot.plugin_manager.plugins_config_path
+        config_path = self.plugin_manager.plugins_config_path
         try:
             if os.path.exists(config_path):
                 with open(config_path, 'r', encoding='utf-8') as f:
@@ -208,7 +199,7 @@ class PluginManagerWidget(QWidget):
     
     def write_config_file(self, config):
         """将插件配置写入配置文件"""
-        config_path = self.chat_robot.plugin_manager.plugins_config_path
+        config_path = self.plugin_manager.plugins_config_path
         try:
             # 确保目录存在
             PathCheck(config_path)

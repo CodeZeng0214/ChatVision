@@ -123,7 +123,7 @@ class PluginManager:
             
             # 清空当前插件，按配置重新加载
             self.plugins.clear()
-            self.all_plugins_config = plugins_config  # 保存所有配置项
+            self.all_plugins_config = plugins_config  # 挂载所有配置项
             
             # 根据配置动态导入和实例化插件
             for plugin_name, plugin_config in plugins_config.items():

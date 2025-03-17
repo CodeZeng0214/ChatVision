@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.chat_widget, "聊天")
         
         # 创建插件管理界面
-        self.plugin_manager = PluginManagerWidget(self.chat_widget.chat_robot)
+        self.plugin_manager = PluginManagerWidget(self.chat_widget.chat_robot.plugin_manager)
         self.tabs.addTab(self.plugin_manager, "插件管理")
         
         # 状态栏

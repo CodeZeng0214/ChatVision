@@ -27,7 +27,15 @@ class Plugin:
         self.execute = None
         self.result = None
         
-        
+    @classmethod
+    def get_class_name(cls)->str:
+        """获取类名"""
+        return cls.__name__
+    
+    def get_module_path(self)->str:
+        """获取模块路径"""
+        return 'plugins.' + os.path.basename(__file__)   
+     
     def describe_plugin(self):
         """为插件生成描述"""
         parameter_description = []
@@ -54,7 +62,16 @@ class Plugin:
         with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         # 2. 添加新数据
-        data[self.plugin_name] = {
+        data[self.plugin_name] = self.get_plugin_config()
+        # 3. 写入文件
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    
+    def get_plugin_config(self)->Dict[str, Any]:
+        """获取插件配置
+        - 返回值: Dict[str, Any] 插件配置字典
+        """
+        return {
             "is_load": self.is_load,
             "enable": self.enable,
             "module_path": self.module_path,
@@ -62,17 +79,6 @@ class Plugin:
             "description": self.description,
             "parameters": self.parameters
         }
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    
-    @classmethod
-    def get_class_name(cls)->str:
-        """获取类名"""
-        return cls.__name__
-    
-    def get_module_path(self)->str:
-        """获取模块路径"""
-        return 'plugins.' + os.path.basename(__file__)
     
     def get_parameter_default(self, param_name):
         """获取参数的默认值"""

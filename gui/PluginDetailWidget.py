@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QPushButton, QFileDialog)
 from PySide6.QtCore import Qt, Signal
 import json
+from gui.PluginListWidgetItem import PluginListWidgetItem
 
 class PluginDetailWidget(QWidget):
     """插件详情显示和编辑组件"""
@@ -41,7 +42,7 @@ class PluginDetailWidget(QWidget):
         
         layout.addStretch()
     
-    def display_plugin(self, plugin_item):
+    def display_plugin(self, plugin_item: PluginListWidgetItem):
         """
         显示插件详情
         
@@ -52,13 +53,13 @@ class PluginDetailWidget(QWidget):
             self.clear()
             return
             
-        self.plugin_name = plugin_item.get_plugin_name()
-        self.plugin_config = plugin_item.get_config()
-        is_loaded = plugin_item.is_loaded
-        is_enabled = plugin_item.is_enabled
+        self.plugin_name = plugin_item.plugin_name
+        self.plugin_config = plugin_item._config
+        is_load = plugin_item.is_load
+        enable = plugin_item.enable
         
         # 设置标题
-        self.title_label.setText(f"插件: {self.plugin_name}")
+        self.title_label.setText(f"插件名称: {self.plugin_name}")
         
         # 清除现有表单和配置字段映射
         while self.form_layout.rowCount() > 0:
@@ -73,14 +74,14 @@ class PluginDetailWidget(QWidget):
         
         # 添加加载配置
         self.load_checkbox = QCheckBox()
-        self.load_checkbox.setChecked(is_loaded)
+        self.load_checkbox.setChecked(is_load)
         self.load_checkbox.toggled.connect(lambda state: self.update_plugin_config('is_load', state))
         self.form_layout.addRow(QLabel("启动时加载:"), self.load_checkbox)
         
         # 启用状态复选框（仅当加载时可编辑）
         self.enable_checkbox = QCheckBox()
-        self.enable_checkbox.setChecked(is_enabled)
-        self.enable_checkbox.setEnabled(is_loaded)  # 只有已加载的插件才能启用/禁用
+        self.enable_checkbox.setChecked(enable)
+        self.enable_checkbox.setEnabled(is_load)  # 只有已加载的插件才能启用/禁用
         self.enable_checkbox.toggled.connect(lambda state: self.update_plugin_config('enable', state))
         self.load_checkbox.toggled.connect(self.update_enable_state)
         self.form_layout.addRow(QLabel("启用插件:"), self.enable_checkbox)
@@ -113,9 +114,9 @@ class PluginDetailWidget(QWidget):
         
         # 显示设置区域和按钮
         self.settings_form.show()
-        self.toggle_btn.setVisible(is_loaded)  # 只有已加载的插件才显示启用/禁用按钮
-        if is_loaded:
-            self.toggle_btn.setText("禁用插件" if is_enabled else "启用插件")
+        self.toggle_btn.setVisible(is_load)  # 只有已加载的插件才显示启用/禁用按钮
+        if is_load:
+            self.toggle_btn.setText("禁用插件" if enable else "启用插件")
     
     def clear(self):
         """清空详情页"""
@@ -137,7 +138,7 @@ class PluginDetailWidget(QWidget):
         if default_value:
             field.setText(str(default_value))
         field.textChanged.connect(lambda text: self.update_parameter(name, text))
-        self.form_layout.addRow(QLabel(f"{name} (可选):"), field)
+        self.form_layout.addRow(QLabel(f"{name} :"), field)
         self.current_config_fields[name] = field
     
     def add_checkbox_field(self, name, description, default_value):
@@ -147,7 +148,7 @@ class PluginDetailWidget(QWidget):
         if isinstance(default_value, bool):
             field.setChecked(default_value)
         field.toggled.connect(lambda state: self.update_parameter(name, state))
-        self.form_layout.addRow(QLabel(f"{name} (可选):"), field)
+        self.form_layout.addRow(QLabel(f"{name}:"), field)
         self.current_config_fields[name] = field
     
     def add_path_field(self, name, description, default_value, is_weight=False):
@@ -172,7 +173,7 @@ class PluginDetailWidget(QWidget):
         container = QWidget()
         container.setLayout(param_layout)
         
-        self.form_layout.addRow(QLabel(f"{name} (可选):"), container)
+        self.form_layout.addRow(QLabel(f"{name}:"), container)
         self.current_config_fields[name] = field
     
     def update_parameter(self, param_name, value):
