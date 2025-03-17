@@ -1,6 +1,7 @@
 {
     "ObjectDetect": {
         "enable": true,
+        "is_load": true,
         "module_path": "tasks.YOLOTasks",
         "class_name": "ObjDetectYOLOTask",
         "description": "使用YOLO进行图像物体检测。",
@@ -25,7 +26,8 @@
         ]
     },
     "HumanPoseEstimate": {
-        "enable": true,
+        "enable": false,
+        "is_load": true,
         "module_path": "tasks.YOLOTasks",
         "class_name": "HummanPoseTrackYOLOTask",
         "description": "使用YOLO进行人体姿态跟踪。",
@@ -51,6 +53,7 @@
     },
     "ImageDescription": {
         "enable": false,
+        "is_load": false,
         "module_path": "tasks.BLIPTasks",
         "class_name": "ImgDescriptionTask",
         "description": "使用BLIP进行图像描述。",

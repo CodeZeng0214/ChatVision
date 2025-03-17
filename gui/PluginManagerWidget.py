@@ -18,6 +18,8 @@ class PluginManagerWidget(QWidget):
         super().__init__()
         self.chat_robot = ChatRobot()
         self.setup_ui()
+        self.pending_changes = {}  # 存储所有待保存的修改
+        self.current_task_name = None  # 当前正在编辑的任务名称
         self.load_plugins()
         self.current_config_fields = {}  # 存储当前正在编辑的配置字段
     
@@ -76,30 +78,55 @@ class PluginManagerWidget(QWidget):
         """加载所有已注册的插件"""
         self.plugin_list.clear()
         
-        # 获取所有已注册的任务
-        tasks = self.chat_robot.task_manager.tasks
+        # 获取配置文件中的所有任务
+        all_tasks = self.read_config_file()
+        loaded_tasks = self.chat_robot.task_manager.tasks
         
-        for task_name, task in tasks.items():
+        for task_name, task_config in all_tasks.items():
             item = QListWidgetItem(task_name)
-            # 根据任务启用状态设置颜色
-            if not task.enable:
+            
+            # 设置加载状态
+            is_loaded = task_config.get('is_load', True)
+            
+            # 设置颜色
+            if not is_loaded:
+                # 未加载的插件显示为浅灰色
+                item.setForeground(Qt.lightGray)
+                item.setToolTip("未加载")
+            elif task_name in loaded_tasks and not loaded_tasks[task_name].enable:
+                # 已加载但未启用的插件显示为灰色
                 item.setForeground(Qt.gray)
+                item.setToolTip("已加载但未启用")
+            else:
+                # 已加载且已启用的插件显示为黑色
+                item.setForeground(Qt.black)
+                item.setToolTip("已加载且已启用")
+                
             self.plugin_list.addItem(item)
     
     def show_plugin_details(self, row):
         """显示选中插件的详情"""
         if row < 0:
             return
+            
+        new_task_name = self.plugin_list.item(row).text()
         
-        task_name = self.plugin_list.item(row).text()
-        # 获取任务实例 (现在是Task对象，不是字典)
-        task : Task = self.chat_robot.task_manager.tasks.get(task_name)
+        # 如果切换任务，先保存当前任务的临时修改
+        if self.current_task_name and self.current_task_name != new_task_name:
+            self.save_current_changes_to_pending()
         
-        if not task:
-            return
+        self.current_task_name = new_task_name
         
-        self.detail_label.setText(f"插件: {task_name}")
-        self.current_task_name = task_name  # 存储当前正在编辑的任务名称
+        # 从配置文件读取任务信息
+        config = self.read_config_file()
+        task_config = config.get(self.current_task_name, {})
+        
+        # 检查任务是否已加载
+        task = self.chat_robot.task_manager.tasks.get(self.current_task_name)
+        is_loaded = task_config.get('is_load', True)
+        
+        # 设置标题
+        self.detail_label.setText(f"插件: {self.current_task_name}")
         
         # 清除现有表单和配置字段映射
         while self.form_layout.rowCount() > 0:
@@ -107,22 +134,69 @@ class PluginManagerWidget(QWidget):
         self.current_config_fields = {}
         
         # 添加描述
-        desc_label = QLabel(task.description)
+        description = task_config.get('description', '无描述') if task_config else '无描述'
+        if task:  # 如果任务已加载，使用实例中的描述
+            description = task.description
+        
+        desc_label = QLabel(description)
         desc_label.setWordWrap(True)
         self.form_layout.addRow(QLabel("描述:"), desc_label)
         
-        # 仅添加非必填参数的设置字段（只有optional参数可配置）
-        for param in task.parameters:
-            name = param["name"]
-            description = param["description"]
-            required = param.get("required", False)
+        # 添加加载配置和启用配置
+        self.load_checkbox = QCheckBox()
+        
+        # 检查是否有待保存的修改
+        if self.current_task_name in self.pending_changes and 'is_load' in self.pending_changes[self.current_task_name]:
+            is_loaded = self.pending_changes[self.current_task_name]['is_load']
+        
+        self.load_checkbox.setChecked(is_loaded)
+        self.load_checkbox.toggled.connect(self.on_field_changed)
+        self.form_layout.addRow(QLabel("启动时加载:"), self.load_checkbox)
+        
+        # 启用状态复选框（仅当加载时可编辑）
+        self.enable_checkbox = QCheckBox()
+        enable_value = task_config.get('enable', True) if task_config else True
+        
+        # 检查是否有待保存的修改
+        if self.current_task_name in self.pending_changes and 'enable' in self.pending_changes[self.current_task_name]:
+            enable_value = self.pending_changes[self.current_task_name]['enable']
+        elif task:  # 如果任务已加载，使用实际状态
+            enable_value = task.enable
+        
+        self.enable_checkbox.setChecked(enable_value)
+        self.enable_checkbox.setEnabled(is_loaded)  # 只有已加载的插件才能启用/禁用
+        self.enable_checkbox.toggled.connect(self.on_field_changed)
+        self.load_checkbox.toggled.connect(self.update_enable_state)
+        self.form_layout.addRow(QLabel("启用任务:"), self.enable_checkbox)
+        
+        # 参数显示和编辑
+        if task_config and 'parameters' in task_config:
+            parameters = task_config['parameters']
+        elif task:  # 如果任务已加载，使用实例中的参数
+            parameters = task.parameters
+        else:
+            parameters = []
+        
+        # 添加参数设置
+        for param in parameters:
+            name = param.get('name', '')
+            description = param.get('description', '')
+            required = param.get('required', False)
             
             # 跳过必填参数，这些应该由用户在消息中提供
             if required:
                 continue
                 
-            # 获取默认值 - 使用get确保即使没有default键也不会出错
-            default_value = param.get("default", "")
+            # 获取默认值 - 首先查看待保存修改，然后查看配置
+            default_value = None
+            if self.current_task_name in self.pending_changes and 'parameters' in self.pending_changes[self.current_task_name]:
+                for pending_param in self.pending_changes[self.current_task_name]['parameters']:
+                    if pending_param.get('name') == name:
+                        default_value = pending_param.get('default', '')
+                        break
+            
+            if default_value is None:
+                default_value = param.get('default', '')
             
             # 不同类型参数的不同处理
             if "path" in name.lower() and "weight" in name.lower():
@@ -133,6 +207,9 @@ class PluginManagerWidget(QWidget):
                 # 设置当前值（如果有）
                 if default_value:
                     field.setText(str(default_value))
+                    
+                # 添加修改事件
+                field.textChanged.connect(self.on_field_changed)
                 
                 # 添加文件浏览按钮（针对权重文件）
                 browse_btn = QPushButton("浏览...")
@@ -167,6 +244,8 @@ class PluginManagerWidget(QWidget):
                 
                 self.form_layout.addRow(QLabel(f"{name} (可选):"), container)
                 self.current_config_fields[name] = field
+                # 添加修改事件
+                field.textChanged.connect(self.on_field_changed)
             elif "is_" in name.lower():
                 field = QCheckBox()
                 field.setToolTip(description)
@@ -177,6 +256,8 @@ class PluginManagerWidget(QWidget):
                 
                 self.form_layout.addRow(QLabel(f"{name} (可选):"), field)
                 self.current_config_fields[name] = field
+                # 添加修改事件
+                field.toggled.connect(self.on_field_changed)
             else:
                 field = QLineEdit()
                 field.setPlaceholderText(f"{description}")
@@ -187,17 +268,80 @@ class PluginManagerWidget(QWidget):
                 
                 self.form_layout.addRow(QLabel(f"{name} (可选):"), field)
                 self.current_config_fields[name] = field
+                # 添加修改事件
+                field.textChanged.connect(self.on_field_changed)
         
         # 显示设置区域和按钮
         self.settings_form.show()
-        self.toggle_btn.show()
         self.save_btn.show()
         
-        # 根据任务启用状态更新按钮文本
-        if task.enable:
-            self.toggle_btn.setText("禁用插件")
+        # 更新保存按钮状态
+        if self.current_task_name in self.pending_changes:
+            self.save_btn.setText("保存修改")
+            self.save_btn.setStyleSheet("background-color: #FFCCCB;")  # 浅红色背景表示有未保存修改
         else:
-            self.toggle_btn.setText("启用插件")
+            self.save_btn.setText("保存设置")
+            self.save_btn.setStyleSheet("")
+        
+        # 更新按钮状态
+        self.toggle_btn.setVisible(is_loaded)  # 只有已加载的插件才显示启用/禁用按钮
+        if task and is_loaded:
+            self.toggle_btn.setText("禁用插件" if task.enable else "启用插件")
+    
+    def on_field_changed(self):
+        """字段修改时的回调"""
+        # 标记有未保存的修改
+        if self.current_task_name not in self.pending_changes:
+            self.pending_changes[self.current_task_name] = {}
+        
+        # 更新保存按钮状态
+        self.save_btn.setText("保存修改")
+        self.save_btn.setStyleSheet("background-color: #FFCCCB;")  # 浅红色背景表示有未保存修改
+        
+    def save_current_changes_to_pending(self):
+        """将当前表单中的修改保存到待保存字典"""
+        if not self.current_task_name:
+            return
+            
+        # 初始化待保存字典
+        if self.current_task_name not in self.pending_changes:
+            self.pending_changes[self.current_task_name] = {}
+        
+        # 收集当前表单中的修改
+        self.pending_changes[self.current_task_name]['is_load'] = self.load_checkbox.isChecked()
+        self.pending_changes[self.current_task_name]['enable'] = self.enable_checkbox.isChecked()
+        
+        # 收集参数修改
+        params_changes = []
+        # 首先从配置文件读取所有参数
+        config = self.read_config_file()
+        task_config = config.get(self.current_task_name, {})
+        original_params = task_config.get('parameters', []) if task_config else []
+        
+        # 复制原始参数
+        for param in original_params:
+            param_copy = param.copy()
+            name = param_copy.get('name', '')
+            
+            # 如果参数在当前编辑的字段中，更新它的值
+            if name in self.current_config_fields:
+                field = self.current_config_fields[name]
+                if isinstance(field, QLineEdit):
+                    param_copy['default'] = field.text()
+                elif isinstance(field, QCheckBox):
+                    param_copy['default'] = field.isChecked()
+            
+            params_changes.append(param_copy)
+        
+        # 保存修改后的参数
+        self.pending_changes[self.current_task_name]['parameters'] = params_changes
+    
+    def update_enable_state(self, is_checked):
+        """更新启用状态复选框"""
+        self.enable_checkbox.setEnabled(is_checked)
+        if not is_checked:
+            self.enable_checkbox.setChecked(False)
+        self.on_field_changed()  # 标记有修改
     
     def browse_path(self, field):
         """打开目录浏览对话框选择路径"""
@@ -220,28 +364,28 @@ class PluginManagerWidget(QWidget):
             item = self.plugin_list.item(current_row)
             task_name = item.text()
             
+            # 检查任务是否已加载
+            task = self.chat_robot.task_manager.tasks.get(task_name)
+            if not task:
+                QMessageBox.warning(self, "操作失败", "此插件未加载，无法启用/禁用")
+                return
+            
             # 切换任务的启用状态
             if self.chat_robot.task_manager.toggle_task(task_name):
-                task = self.chat_robot.task_manager.tasks.get(task_name)
                 if task.enable:
                     item.setForeground(Qt.black)  # 启用(黑色)
                     self.toggle_btn.setText("禁用插件")
+                    self.enable_checkbox.setChecked(True)
                 else:
                     item.setForeground(Qt.gray)  # 禁用(灰色)
                     self.toggle_btn.setText("启用插件")
+                    self.enable_checkbox.setChecked(False)
     
     def save_plugin_settings(self):
-        """保存插件设置到配置文件"""
-        current_row = self.plugin_list.currentRow()
-        if current_row < 0:
-            return
-            
-        task_name = self.plugin_list.item(current_row).text()
-        task = self.chat_robot.task_manager.tasks.get(task_name)
+        """保存所有插件设置到配置文件"""
+        # 保存当前表单中的修改到待保存字典
+        self.save_current_changes_to_pending()
         
-        if not task:
-            return
-            
         try:
             # 1. 读取配置文件
             config = self.read_config_file()
@@ -249,39 +393,66 @@ class PluginManagerWidget(QWidget):
                 QMessageBox.warning(self, "读取失败", "无法读取配置文件")
                 return
                 
-            # 2. 收集用户修改的配置
-            updated_params = {}
-            for name, field in self.current_config_fields.items():
-                if isinstance(field, QLineEdit) and field.text():
-                    updated_params[name] = field.text()
-                elif isinstance(field, QCheckBox):
-                    updated_params[name] = field.isChecked()
+            # 2. 更新配置文件中的任务设置
+            for task_name, changes in self.pending_changes.items():
+                if task_name not in config:
+                    continue
+                
+                # 更新任务配置
+                is_load = changes.get('is_load')
+                if is_load is not None:
+                    config[task_name]["is_load"] = is_load
+                    
+                    # 如果不加载，则强制设置为不启用
+                    if not is_load:
+                        config[task_name]["enable"] = False
+                    else:
+                        enable_value = changes.get('enable', True)
+                        config[task_name]["enable"] = enable_value
+                
+                # 更新参数设置
+                if 'parameters' in changes:
+                    # 创建参数名到参数的映射
+                    config_params = {param.get('name'): i for i, param in enumerate(config[task_name]["parameters"])}
+                    
+                    # 更新参数值
+                    for param in changes['parameters']:
+                        name = param.get('name')
+                        if name in config_params and not param.get('required', False):
+                            config[task_name]["parameters"][config_params[name]]['default'] = param.get('default')
             
-            # 3. 更新任务配置
-            if task_name in config:
-                # 更新任务参数的默认值
-                for param in config[task_name]["parameters"]:
-                    if param["name"] in updated_params and not param.get("required", False):
-                        param["default"] = updated_params[param["name"]]
-                
-                # 更新任务启用状态
-                config[task_name]["enable"] = task.enable
-                
-                # 4. 将更新后的配置写入文件
-                self.write_config_file(config)
-                
-                # 5. 更新任务对象
-                for param in task.parameters:
-                    if param["name"] in updated_params and not param.get("required", False):
-                        param["default"] = updated_params[param["name"]]
-                
-                self.save_btn.setText("设置已保存!")
-                # 恢复按钮文字
-                QTimer.singleShot(2000, lambda: self.save_btn.setText("保存设置"))
-                
-                QMessageBox.information(self, "成功", "插件配置已成功保存!")
-            else:
-                QMessageBox.warning(self, "保存失败", f"配置文件中不存在任务 {task_name}")
+            # 3. 将配置写入文件
+            self.write_config_file(config)
+            
+            # 4. 更新任务对象（如果已加载）
+            for task_name, changes in self.pending_changes.items():
+                task = self.chat_robot.task_manager.tasks.get(task_name)
+                if task:
+                    if 'enable' in changes:
+                        task.enable = changes['enable']
+                    
+                    if 'parameters' in changes:
+                        # 更新参数默认值
+                        for changed_param in changes['parameters']:
+                            name = changed_param.get('name')
+                            if name and 'default' in changed_param:
+                                for param in task.parameters:
+                                    if param.get('name') == name and not param.get('required', False):
+                                        param['default'] = changed_param['default']
+                                        break
+            
+            # 5. 清除待保存的修改
+            self.pending_changes = {}
+            
+            # 6. 更新界面
+            self.save_btn.setText("设置已保存!")
+            self.save_btn.setStyleSheet("")
+            QTimer.singleShot(2000, lambda: self.save_btn.setText("保存设置"))
+            
+            # 7. 刷新插件列表，反映新状态
+            self.load_plugins()
+            
+            QMessageBox.information(self, "成功", "插件配置已成功保存!\n设置将在程序重启后生效。")
                 
         except Exception as e:
             QMessageBox.warning(self, "保存失败", f"保存设置时发生错误: {e}")
@@ -323,3 +494,20 @@ class PluginManagerWidget(QWidget):
         
         if file_path:
             QMessageBox.information(self, "导入插件", "插件导入功能尚未实现")
+    
+    def closeEvent(self, event):
+        """关闭窗口前检查是否有未保存的修改"""
+        if self.pending_changes:
+            reply = QMessageBox.question(self, "未保存的修改", 
+                                       "有未保存的插件设置修改，是否保存？",
+                                       QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            
+            if reply == QMessageBox.Yes:
+                self.save_plugin_settings()
+                event.accept()
+            elif reply == QMessageBox.No:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()

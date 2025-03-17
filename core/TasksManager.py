@@ -16,6 +16,7 @@ class TasksManager:
     """
     def __init__(self):
         self.tasks = {}  # 任务字典，键为任务名称，值为Task对象
+        self.all_available_tasks = {}  # 存储配置文件中所有可用的任务
         self.tasks_config_path = "tasks/TasksConfigs.json"  # 任务配置的默认路径
         
         # 确保配置文件目录存在
@@ -60,6 +61,7 @@ class TasksManager:
                                     # 收集配置信息
                                     config[task_instance.task_name] = {
                                         'enable': True,
+                                        'is_load': True,  # 添加默认为True的is_load配置项
                                         'module_path': f"tasks.{module_name}",
                                         'class_name': class_name,
                                         'description': task_instance.description,
@@ -101,10 +103,12 @@ class TasksManager:
             
             # 清空当前任务，按配置重新加载
             self.tasks.clear()
+            self.all_available_tasks = config  # 保存所有配置项
             
             # 根据配置动态导入和实例化任务
             for task_name, task_config in config.items():
-                if task_config.get('enable', True):
+                # 使用is_load来控制是否加载任务
+                if task_config.get('is_load', True):  # 默认加载
                     try:
                         # 从配置获取模块路径和类名
                         module_path = task_config.get('module_path')
@@ -141,13 +145,15 @@ class TasksManager:
                                     if 'default' in config_param:
                                         param['default'] = config_param['default']
                         
-                        # 注册任务
+                        # 注册任务并设置enable状态
                         self.register_task(task_instance)
-                        print(f"已加载并启用任务: {task_name}")
+                        # 使用配置中的enable值更新任务启用状态
+                        task_instance.enable = task_config.get('enable', True)
+                        print(f"已加载任务: {task_name}, 启用状态: {task_instance.enable}")
                     except Exception as e:
                         print(f"加载任务失败 {task_name}: {e}")
                 else:
-                    print(f"任务已在配置中禁用: {task_name}")
+                    print(f"任务已配置为不加载: {task_name}")
             
             print(f"加载完成，共启用 {len(self.tasks)} 个任务")
         except Exception as e:
@@ -180,6 +186,9 @@ class TasksManager:
                 if task_name in config:
                     # 更新现有任务的启用状态
                     config[task_name]['enable'] = task.enable
+                    # 如果没有is_load键，添加默认为True
+                    if 'is_load' not in config[task_name]:
+                        config[task_name]['is_load'] = True
                 else:
                     # 为新任务创建配置项
                     # 从任务实例获取模块和类名信息
@@ -188,6 +197,7 @@ class TasksManager:
                     
                     config[task_name] = {
                         'enable': task.enable,
+                        'is_load': True,  # 新任务默认加载
                         'module_path': class_info,
                         'class_name': class_name,
                         'description': task.description,
@@ -233,6 +243,11 @@ class TasksManager:
     def save_settings(self):
         """保存当前任务设置到配置文件"""
         self.write_tasks_to_config()
+    
+    # 获取所有可用任务配置（包括未加载的）
+    def get_all_available_tasks(self):
+        """获取配置中的所有任务（包括未加载的）"""
+        return self.all_available_tasks
 
 
 
