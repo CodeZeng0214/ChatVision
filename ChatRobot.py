@@ -9,6 +9,7 @@
 from core.ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from core.PluginManager import PluginManager # 导入插件管理器
 from core.Plugin import Plugin # 导入插件基类
+import threading  # 确保导入threading模块
 
 # 条件导入PySide6，当此脚本不是启动脚本时导入
 if __name__ != '__main__':
@@ -204,29 +205,51 @@ class ChatRobot(QObject):
         if not plugin:
             return False
             
-        # 执行插件
-        self.processing_plugin.emit(f"正在执行{self.current_plugin}插件...") if HAS_PYSIDE else None
-        plugin_results = plugin.execute(parameters)
+        # 通知GUI插件开始处理
+        if HAS_PYSIDE:
+            self.processing_plugin.emit(f"正在执行{self.current_plugin}插件...")
         
-        # 通知插件已完成
-        if "image_path" in parameters:
-            self.plugin_completed.emit(self.current_plugin, parameters["image_path"]) if HAS_PYSIDE else None
-        
-        # 用 GPT 根据结果生成自然语言回复
+        # 保存当前状态供线程使用
+        current_plugin = self.current_plugin
         last_question = self.messages[-1]["content"] if self.messages else ""
-        result_summary = f"插件类型：{self.current_plugin}\n插件结果：{plugin_results}"
-        response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                    + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                    + last_question}], self._stream_callback if HAS_PYSIDE else None)
         
-        self.messages.append({"role": "assistant", "content": response})
-        self.response_ready.emit(response) if HAS_PYSIDE else None
-        
-        # 重置状态
+        # 重置状态，避免重复触发处理
         self.waiting_for_params = False
         self.current_plugin = None
         
+        # 在新线程中执行插件
+        threading.Thread(
+            target=self._execute_plugin_in_thread, 
+            args=(plugin, parameters, current_plugin, last_question),
+            daemon=True
+        ).start()
+        
         return True
+
+    def _execute_plugin_in_thread(self, plugin, parameters, plugin_name, last_question):
+        """在新线程中执行插件处理"""
+        try:
+            # 执行插件
+            plugin_results = plugin.execute(parameters)
+            
+            # 通知插件已完成
+            if "image_path" in parameters and HAS_PYSIDE:
+                self.plugin_completed.emit(plugin_name, parameters["image_path"])
+            
+            # 用 GPT 根据结果生成自然语言回复
+            result_summary = f"插件类型：{plugin_name}\n插件结果：{plugin_results}"
+            response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
+                                    + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
+                                    + last_question}], self._stream_callback if HAS_PYSIDE else None)
+            
+            self.messages.append({"role": "assistant", "content": response})
+            if HAS_PYSIDE:
+                self.response_ready.emit(response)
+        except Exception as e:
+            error_message = f"处理插件参数时发生错误: {e}"
+            print(error_message)
+            if HAS_PYSIDE:
+                self.response_ready.emit(error_message)
 
     
 if __name__ == '__main__':
