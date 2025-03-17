@@ -96,7 +96,7 @@ class TasksManager:
             return
         
         # 从配置文件加载
-        print(f"从配置文件加载任务: {tasks_config_path}")
+        print(f"正在从配置文件加载任务: {tasks_config_path}")
         try:
             with open(tasks_config_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)

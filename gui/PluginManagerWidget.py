@@ -14,9 +14,9 @@ from core.AuxiliaryFunction import PathCheck
 class PluginManagerWidget(QWidget):
     """插件管理界面"""
     
-    def __init__(self):
+    def __init__(self, chat_robot: ChatRobot):
         super().__init__()
-        self.chat_robot = ChatRobot()
+        self.chat_robot = chat_robot
         self.setup_ui()
         self.pending_changes = {}  # 存储所有待保存的修改
         self.current_task_name = None  # 当前正在编辑的任务名称

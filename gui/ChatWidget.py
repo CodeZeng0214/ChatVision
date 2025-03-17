@@ -163,6 +163,10 @@ class ChatWidget(QWidget):
         # 在新线程中处理消息
         threading.Thread(target=self._process_message_in_thread, 
                         args=(message_text,), daemon=True).start()
+        
+    def getTaskmanager(self):
+        """获取聊天机器人的任务管理器"""
+        return self.chat_robot.task_manager
     
     def _process_message_in_thread(self, message_text):
         """在新线程中处理消息"""
