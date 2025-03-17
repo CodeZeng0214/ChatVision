@@ -20,7 +20,7 @@
                 "name": "is_show",
                 "description": "是否显示检测结果",
                 "required": false,
-                "default": false
+                "default": true
             }
         ]
     },

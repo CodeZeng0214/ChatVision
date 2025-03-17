@@ -121,7 +121,7 @@ class PluginManagerWidget(QWidget):
             if required:
                 continue
                 
-            # 获取默认值
+            # 获取默认值 - 使用get确保即使没有default键也不会出错
             default_value = param.get("default", "")
             
             # 不同类型参数的不同处理

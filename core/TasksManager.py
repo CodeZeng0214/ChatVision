@@ -127,7 +127,19 @@ class TasksManager:
                         if 'description' in task_config and task_config['description']:
                             task_instance.description = task_config['description']
                             
-                        # 可以添加更多属性更新...
+                        # 更新参数默认值
+                        if 'parameters' in task_config:
+                            # 根据名称匹配参数并更新默认值
+                            config_params = {param.get('name'): param for param in task_config['parameters'] 
+                                            if 'name' in param}
+                            
+                            for param in task_instance.parameters:
+                                param_name = param.get('name')
+                                if param_name in config_params:
+                                    config_param = config_params[param_name]
+                                    # 复制默认值
+                                    if 'default' in config_param:
+                                        param['default'] = config_param['default']
                         
                         # 注册任务
                         self.register_task(task_instance)
