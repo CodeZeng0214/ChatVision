@@ -1,6 +1,5 @@
 ## 使用YOLO进行图像识别的插件实现
 
-from ultralytics import YOLO
 from core.Plugin import Plugin
 import os
 
@@ -16,6 +15,8 @@ class ObjDetectYOLOPlugin(Plugin):
     图像物体检测插件实现。\n
     参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
+    from ultralytics import YOLO
+    
     def __init__(self):
         super().__init__('ObjectDetect', 
                          [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
@@ -66,6 +67,7 @@ class HummanPoseTrackYOLOPlugin(Plugin):
     人体姿态跟踪插件实现。\n
     参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
+    from ultralytics import YOLO
     def __init__(self):
         super().__init__('HumanPoseEstimate', 
                          [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},

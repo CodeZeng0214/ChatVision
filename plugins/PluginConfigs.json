@@ -1,7 +1,7 @@
 {
     "ObjectDetect": {
-        "enable": true,
         "is_load": true,
+        "enable": true,
         "module_path": "plugins.YOLOPlugins",
         "class_name": "ObjDetectYOLOPlugin",
         "description": "使用YOLO进行图像物体检测。",
@@ -26,8 +26,8 @@
         ]
     },
     "HumanPoseEstimate": {
-        "enable": true,
         "is_load": true,
+        "enable": false,
         "module_path": "plugins.YOLOPlugins",
         "class_name": "HummanPoseTrackYOLOPlugin",
         "description": "使用YOLO进行人体姿态跟踪。",
@@ -52,8 +52,8 @@
         ]
     },
     "ImageDescription": {
-        "enable": false,
         "is_load": false,
+        "enable": false,
         "module_path": "plugins.BLIPPlugins",
         "class_name": "ImgDescriptionPlugin",
         "description": "使用BLIP进行图像描述。",
