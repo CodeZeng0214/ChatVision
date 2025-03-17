@@ -61,7 +61,7 @@ class ChatRobot(QObject):
             self.messages.append({"role": "user", "content": question})
 
             # 告知 语言大模型 支持的插件的 提示模板
-            plugin_descriptions = self.plugin_manager.describePlugins()
+            plugin_descriptions = self.plugin_manager.describe_plugins()
 
             # 使用 语言大模型 分析用户输入意图
             plugin_info = self._AnalyInput(question, plugin_descriptions)

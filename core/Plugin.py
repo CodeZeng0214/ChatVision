@@ -1,12 +1,13 @@
 ### Plugin基类定义
 from typing import Dict, Any, Callable, List
 import json
+import os
 
 class Plugin:
     """参数解释：\n
     - plugin_name: str 插件名称\n
-    - is_load: bool 是否加载\n
-    - enable: bool 是否启用\n
+    - is_load: bool 是否加载，默认为True\n
+    - enable: bool 是否启用，默认为True\n
     - module_path: str 模块路径\n
     - class_name: str 类名\n
     - description: str 描述\n
@@ -14,13 +15,13 @@ class Plugin:
     - execute: Callable[[Dict[str, Any]], Any] 执行函数\n
     - result: Any 执行结果\n
     """
-    def __init__(self, plugin_name: str, parameters: List[Dict[str, Any]], description: str = ""):
+    def __init__(self, plugin_name: str, description: str = "", parameters: List[Dict[str, Any]] = []):
 
         self.plugin_name = plugin_name
         self.is_load = True
         self.enable = True
-        self.module_path = ""
-        self.class_name = ""
+        self.module_path = self.get_module_path()
+        self.class_name = self.get_class_name()
         self.description = description
         self.parameters = parameters
         self.execute = None
@@ -63,7 +64,15 @@ class Plugin:
         }
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-
+    
+    @classmethod
+    def get_class_name(cls)->str:
+        """获取类名"""
+        return cls.__name__
+    
+    def get_module_path(self)->str:
+        """获取模块路径"""
+        return 'plugins.' + os.path.basename(__file__)
     
     def get_parameter_default(self, param_name):
         """获取参数的默认值"""

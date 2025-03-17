@@ -117,7 +117,7 @@ class PluginManager:
             return
         
         # 从配置文件加载
-        print(f"正在从配置文件加载插件: {plugins_config_path}")
+        print(f"正在读取配置文件以加载插件: {plugins_config_path}")
         try:
             plugins_config = self.read_plugins_config_file(plugins_config_path)
             
@@ -176,7 +176,7 @@ class PluginManager:
         except TypeError as e:
             print(f"数据序列化失败: {e}")
     
-    def describePlugins(self) -> str:
+    def describe_plugins(self) -> str:
         """生成所有插件的描述"""
         descriptions = []
         for plugin_name, plugin in self.plugins.items():
