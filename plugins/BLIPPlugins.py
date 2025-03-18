@@ -8,7 +8,7 @@ from core.Plugin import Plugin
 #@ 待实现 考虑将用户的问题转化为英文作为参数传入
 
 ### ========== 全局参数 ========== ###
-BLIP_PATH = './weights/blip-image-captioning-large' # BLIP 推理模型
+BLIP_PATH = 'weights/blip-image-captioning-large' # BLIP 推理模型 默认路径
 
 
 ### ========== 具体实现 ========== ###
@@ -19,9 +19,9 @@ class ImgDescriptionPlugin(Plugin):
     """
     def __init__(self):
         super().__init__('ImageDescription', 
+                        "使用BLIP进行图像描述。",
                          [{'name': 'image_path', 'description': '待描述的图像路径', 'required': True},
-                          {'name': 'weight_path', 'description': 'BLIP权重路径', 'required': False}],
-                         "使用BLIP进行图像描述。")
+                          {'name': 'weight_path', 'description': 'BLIP权重路径', 'required': False, 'default': BLIP_PATH}])
         self.execute = self.ImgDescription
     
     # 图像描述

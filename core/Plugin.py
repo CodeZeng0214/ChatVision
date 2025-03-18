@@ -2,6 +2,7 @@
 from typing import Dict, Any, Callable, List
 import json
 import os
+import inspect
 
 class Plugin:
     """参数解释：\n
@@ -34,7 +35,11 @@ class Plugin:
     
     def get_module_path(self)->str:
         """获取模块路径"""
-        return 'plugins.' + os.path.basename(__file__)   
+        # 使用inspect获取调用类所在的模块
+        module = inspect.getmodule(self.__class__)
+        # 获取模块名
+        module_name = module.__name__
+        return module_name
      
     def describe_plugin(self):
         """为插件生成描述"""

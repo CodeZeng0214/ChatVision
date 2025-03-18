@@ -43,6 +43,7 @@ class PluginManager:
         返回：int 新插件数量"""
         existing_plugins_config = self.read_config_from_file(self.plugins_config_path)
         existing_config_classes = [plugin["class_name"] for plugin in existing_plugins_config.values()]
+        existing_module = [plugin["module_path"] for plugin in existing_plugins_config.values()]
         new_plugin_count = 0
         try:
             # 添加插件目录到Python路径
@@ -54,12 +55,16 @@ class PluginManager:
             
             # 遍历插件目录下所有.py文件
             for filename in os.listdir(plugin_dir):
+
                 if filename.endswith(".py") and not filename.startswith("__"):
                     module_name = filename[:-3]  # 去掉.py后缀
+                    # 若插件模块已存在配置中，则跳过
+                    if 'plugins.' + module_name in existing_module:
+                        continue
                     try:
                         # 导入插件模块
                         module = importlib.import_module(f"plugins.{module_name}")
-                        
+
                         # 查找模块中的Plugin子类并收集信息
                         for class_name, obj in inspect.getmembers(module):
                             # 若插件已存在配置中，则跳过

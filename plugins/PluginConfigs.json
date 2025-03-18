@@ -70,5 +70,31 @@
                 "default": "weights/blip.pt"
             }
         ]
+    },
+    "TestPlugin": {
+        "is_load": false,
+        "enable": false,
+        "module_path": "plugins.TestPlugins",
+        "class_name": "TestPlugin",
+        "description": "测试插件。",
+        "parameters": [
+            {
+                "name": "image_path",
+                "description": "待检测的图像路径",
+                "required": true
+            },
+            {
+                "name": "weight_path",
+                "description": "YOLO权重路径",
+                "required": false,
+                "default": ".//weights//YOLO_World//yolov8s-worldv2.pt"
+            },
+            {
+                "name": "is_show",
+                "description": "是否显示检测结果",
+                "required": false,
+                "default": true
+            }
+        ]
     }
 }

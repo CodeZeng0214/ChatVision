@@ -181,7 +181,7 @@ class PluginManagerWidget(QWidget):
         QMessageBox.information(self, "保存成功", "插件配置已成功保存!\n“是否加载”设置将在程序重启后生效。")
         
     def import_plugin(self):
-        """（待完全实现）导入外部插件"""
+        """导入外部插件"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择插件文件", "", "Python文件 (*.py)"
         )

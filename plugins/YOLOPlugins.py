@@ -15,14 +15,13 @@ class ObjDetectYOLOPlugin(Plugin):
     图像物体检测插件实现。\n
     参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
-    from ultralytics import YOLO
-    
+
     def __init__(self):
         super().__init__('ObjectDetect', 
+                        "使用YOLO进行图像物体检测。",
                          [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
-                          {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False},
-                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False}],
-                         "使用YOLO进行图像物体检测。")
+                          {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False, 'default': DET_WEI_PATH},
+                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True}])
         self.execute = self.objDetect
     
     # 图像物体识别（YOLO）
@@ -31,6 +30,7 @@ class ObjDetectYOLOPlugin(Plugin):
         物体检测插件实现。\n
         参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
         """
+        from ultralytics import YOLO
         image_path = params['image_path']
         weight_path = params.get('weight_path', DET_WEI_PATH)
         is_show = params.get('is_show', False)
@@ -67,13 +67,12 @@ class HummanPoseTrackYOLOPlugin(Plugin):
     人体姿态跟踪插件实现。\n
     参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
-    from ultralytics import YOLO
     def __init__(self):
         super().__init__('HumanPoseEstimate', 
+                         "使用YOLO进行人体姿态跟踪。", 
                          [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
-                          {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False},
-                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False}],
-                         "使用YOLO进行人体姿态跟踪。")
+                          {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False, 'default': POSE_WEI_PATH},
+                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True}])
         self.execute = self.hummanPoseTrack
 
     # 人体姿态跟踪（YOLO）
@@ -82,6 +81,8 @@ class HummanPoseTrackYOLOPlugin(Plugin):
         人体姿态跟踪插件实现。\n
         参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
         """
+        from ultralytics import YOLO
+                
         image_path = params['image_path']
         weight_path = params.get('weight_path', POSE_WEI_PATH)
         is_show = params.get('is_show', False)
