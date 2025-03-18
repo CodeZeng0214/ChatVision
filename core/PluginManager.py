@@ -36,7 +36,7 @@ class PluginManager:
             self.discover_new_plugin_classes()
             self.load_plugins_from_config(self.plugins_config_path)
             
-    def read_plugins_config_file(self, plugins_config_path: str) -> Dict[str, Dict[str, Any]]:
+    def read_config_from_file(self, plugins_config_path: str) -> Dict[str, Dict[str, Any]]:
         """读取插件配置文件\n
         参数：\n
         - plugins_config_path: str 插件配置文件路径(优先使用传入的路径，否则使用默认路径)\n
@@ -55,7 +55,7 @@ class PluginManager:
         可选参数：\n
         - new_plugins_path: str 新插件目录路径，默认为'plugins'\n
         返回：int 新插件数量"""
-        existing_plugins_config = self.read_plugins_config_file(self.plugins_config_path)
+        existing_plugins_config = self.read_config_from_file(self.plugins_config_path)
         existing_config_classes = [plugin["class_name"] for plugin in existing_plugins_config.values()]
         new_plugin_count = 0
         try:
@@ -119,7 +119,7 @@ class PluginManager:
         # 从配置文件加载
         print(f"正在读取配置文件以加载插件: {plugins_config_path}")
         try:
-            plugins_config = self.read_plugins_config_file(plugins_config_path)
+            plugins_config = self.read_config_from_file(plugins_config_path)
             
             # 清空当前插件，按配置重新加载
             self.plugins.clear()
@@ -158,7 +158,7 @@ class PluginManager:
             print(f"加载插件配置失败: {e}")
             raise
     
-    def write_plugins_to_config(self, plugins_config_path: str = None, plugins_config: Dict[str, Dict[str, Any]] = None):
+    def write_config_to_file(self, plugins_config_path: str = None, plugins_config: Dict[str, Dict[str, Any]] = None):
         """将插件配置写入配置文件，覆盖原有配置"""
         # 确保配置文件目录存在
         os.makedirs(os.path.dirname(plugins_config_path), exist_ok=True)
@@ -206,7 +206,7 @@ class PluginManager:
     # 保存当前设置
     def save_settings(self):
         """保存当前插件设置到配置文件"""
-        self.write_plugins_to_config()
+        self.write_config_to_file()
     
     # 获取所有可用插件配置（包括未加载的）
     def get_all_available_plugins(self):

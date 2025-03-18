@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QListWidgetItem, QLabel, QCheckBox, QLineEdit, 
                               QWidget, QHBoxLayout, QPushButton, QFormLayout,
-                              QFileDialog)
+                              QFileDialog, QVBoxLayout, QGroupBox, QScrollArea)
 from PySide6.QtCore import Qt, Signal, QObject
 from copy import deepcopy
 
@@ -8,9 +8,10 @@ from copy import deepcopy
 class PluginItemSignals(QObject):
     """插件列表项信号代理"""
     config_changed = Signal(str)  # 当配置变更时发出信号
+    save_needed = Signal(bool)    # 当需要保存时发出信号
 
 class PluginListWidgetItem(QListWidgetItem):
-    """表示插件列表中的一个项目，包含完整的插件配置和修改状态"""
+    """表示插件列表中的一个项目，包含完整的插件配置和修改状态，并管理详情视图"""
     
     def __init__(self, plugin_name, plugin_config=None):
         """
@@ -27,6 +28,14 @@ class PluginListWidgetItem(QListWidgetItem):
         self.enable = self._config.get('enable', True)
         self._pending_changes = {}  # 存储未保存的修改
         self.signals = PluginItemSignals()  # 信号代理
+        
+        # 详情视图相关属性
+        self.detail_view = None        # 详情视图容器
+        self.detail_title = None       # 详情视图标题
+        self.form_layout = None        # 表单布局
+        self.settings_form = None      # 设置表单
+        self.toggle_btn = None         # 启用/禁用按钮
+        
         self.update_appearance()
     
     def update_appearance(self):
@@ -75,6 +84,7 @@ class PluginListWidgetItem(QListWidgetItem):
         if modified:
             self.update_appearance()
             self.signals.config_changed.emit(self.plugin_name)
+            self.signals.save_needed.emit(True)
     
     def update_parameter(self, param_name, value):
         """更新参数值"""
@@ -94,6 +104,7 @@ class PluginListWidgetItem(QListWidgetItem):
                     
         # 通知有修改
         self.signals.config_changed.emit(self.plugin_name)
+        self.signals.save_needed.emit(True)
     
     
     def get_config(self):
@@ -293,3 +304,143 @@ class PluginListWidgetItem(QListWidgetItem):
                 self.create_text_field(form_layout, name, description, value)
         
         return controls
+
+    def create_detail_view(self, container):
+        """
+        在给定的容器中创建详情视图
+        
+        参数:
+            container: 用于放置详情视图的容器控件
+        """
+        # 创建一个全新的小部件来替换容器中的内容
+        new_widget = QWidget()
+        detail_layout = QVBoxLayout(new_widget)
+        
+        # 插件标题
+        self.detail_title = QLabel(f"插件: {self.plugin_name}")
+        self.detail_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        detail_layout.addWidget(self.detail_title)
+        
+        # 创建滚动区域以支持内容过多时滚动
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
+        # 创建设置表单容器
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        
+        # 插件设置表单
+        self.settings_form = QGroupBox("插件设置")
+        self.form_layout = QFormLayout(self.settings_form)
+        content_layout.addWidget(self.settings_form)
+        
+        # 填充表单内容
+        self._populate_form()
+        
+        # 启用/禁用按钮
+        self.toggle_btn = QPushButton("启用/禁用插件")
+        self.toggle_btn.setEnabled(self.is_load)
+        self.toggle_btn.setText("禁用插件" if self.enable else "启用插件")
+        self.toggle_btn.clicked.connect(self._on_toggle_clicked)
+        content_layout.addWidget(self.toggle_btn)
+        
+        content_layout.addStretch()
+        scroll_area.setWidget(content_widget)
+        detail_layout.addWidget(scroll_area)
+        
+        # 清除并替换容器的内容
+        if container.layout():
+            # 删除旧布局中的所有部件
+            old_layout = container.layout()
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+            
+            # 安全删除旧布局
+            QWidget().setLayout(old_layout)  # 将旧布局转移到临时控件
+        
+        # 设置新布局并添加我们的新部件
+        container_layout = QVBoxLayout(container)
+        container_layout.addWidget(new_widget)
+        
+        # 保存对详情视图的引用
+        self.detail_view = container
+        
+        return container
+    
+    def update_detail_view(self):
+        """更新详情视图的内容"""
+        if not self.detail_view:
+            return
+            
+        # 更新标题
+        if self.detail_title:
+            self.detail_title.setText(f"插件: {self.plugin_name}")
+            
+        # 更新启用/禁用按钮状态
+        if self.toggle_btn:
+            self.toggle_btn.setEnabled(self.is_load)
+            self.toggle_btn.setText("禁用插件" if self.enable else "启用插件")
+    
+    def _populate_form(self):
+        """填充详情表单内容"""
+        if not self.form_layout:
+            return
+            
+        # 清空表单
+        while self.form_layout.rowCount() > 0:
+            self.form_layout.removeRow(0)
+            
+        # 获取插件配置
+        config = self.get_config()
+        
+        # 添加描述
+        description = config.get('description', '无描述')
+        desc_label = QLabel(description)
+        desc_label.setWordWrap(True)
+        self.form_layout.addRow(QLabel("描述:"), desc_label)
+        
+        # 创建加载状态复选框
+        load_checkbox = QCheckBox()
+        load_checkbox.setChecked(self.is_load)
+        load_checkbox.toggled.connect(lambda state: self.update_config(is_load=state))
+        self.form_layout.addRow(QLabel("启动时加载:"), load_checkbox)
+        
+        # 创建启用状态复选框
+        enable_checkbox = QCheckBox()
+        enable_checkbox.setChecked(self.enable)
+        enable_checkbox.setEnabled(self.is_load)
+        enable_checkbox.toggled.connect(lambda state: self.update_config(enable=state))
+        load_checkbox.toggled.connect(lambda state: enable_checkbox.setEnabled(state))
+        self.form_layout.addRow(QLabel("启用插件:"), enable_checkbox)
+        
+        # 添加参数配置
+        parameters = config.get('parameters', [])
+        for param in parameters:
+            name = param.get('name', '')
+            description = param.get('description', '')
+            required = param.get('required', False)
+            
+            # 跳过必填参数
+            if required:
+                continue
+                
+            # 获取参数当前值
+            value = self.get_parameter_value(name)
+            
+            # 根据参数类型创建控件
+            if "path" in name.lower() and "weight" in name.lower():
+                self.create_path_field(self.form_layout, name, description, value, is_weight=True)
+            elif "path" in name.lower():
+                self.create_path_field(self.form_layout, name, description, value, is_weight=False)
+            elif "is_" in name.lower():
+                self.create_checkbox_field(self.form_layout, name, description, value)
+            else:
+                self.create_text_field(self.form_layout, name, description, value)
+
+    def _on_toggle_clicked(self):
+        """处理启用/禁用按钮点击事件"""
+        if self.is_load:
+            self.update_config(enable=not self.enable)
