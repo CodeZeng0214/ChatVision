@@ -1,14 +1,15 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QPushButton, QListWidget, QListWidgetItem,
-                               QGroupBox, QMessageBox, QFileDialog)
+                               QPushButton, QListWidget, QGroupBox, QFormLayout,
+                               QMessageBox, QFileDialog, QLineEdit, QCheckBox,
+                               QScrollArea)
 from PySide6.QtCore import Qt, QTimer
 import json
 import os
+from typing import Dict
 
 from core.PluginManager import PluginManager
 from core.AuxiliaryFunction import PathCheck
 from gui.PluginListWidgetItem import PluginListWidgetItem
-from gui.PluginDetailWidget import PluginDetailWidget
 
 class PluginManagerWidget(QWidget):
     """插件管理界面"""
@@ -16,7 +17,8 @@ class PluginManagerWidget(QWidget):
     def __init__(self, plugin_manager: PluginManager):
         super().__init__()
         self.plugin_manager = plugin_manager
-        self.plugin_items = {}  # 存储所有插件项的引用
+        self.plugin_items: Dict[str, PluginListWidgetItem] = {}  # 插件项字典，键为插件名称，值为PluginListWidgetItem对象
+        self.current_plugin_item = None  # 当前选中的插件项
         self.setup_ui()
         self.load_plugins()
     
@@ -54,10 +56,33 @@ class PluginManagerWidget(QWidget):
         
         main_layout.addWidget(left_panel, 1)  # 左侧占比较小
         
-        # 右侧插件详情
-        self.detail_widget = PluginDetailWidget()
-        self.detail_widget.plugin_changed.connect(self.on_plugin_changed)
-        main_layout.addWidget(self.detail_widget, 2)  # 右侧占比较大
+        # 右侧插件详情区域
+        self.detail_panel = QScrollArea()
+        self.detail_panel.setWidgetResizable(True)
+        
+        # 详情容器
+        self.detail_container = QWidget()
+        self.detail_layout = QVBoxLayout(self.detail_container)
+        
+        # 插件标题
+        self.detail_title = QLabel("选择插件查看详情")
+        self.detail_title.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.detail_layout.addWidget(self.detail_title)
+        
+        # 插件设置表单
+        self.settings_form = QGroupBox("插件设置")
+        self.form_layout = QFormLayout(self.settings_form)
+        self.detail_layout.addWidget(self.settings_form)
+        
+        # 启用/禁用按钮
+        self.toggle_btn = QPushButton("启用/禁用插件")
+        self.toggle_btn.clicked.connect(self.toggle_plugin)
+        self.detail_layout.addWidget(self.toggle_btn)
+        
+        self.detail_layout.addStretch()
+        self.detail_panel.setWidget(self.detail_container)
+        
+        main_layout.addWidget(self.detail_panel, 2)  # 右侧占比较大
     
     def load_plugins(self):
         """初始化并加载所有已注册的插件"""
@@ -68,9 +93,9 @@ class PluginManagerWidget(QWidget):
         all_plugins_config = self.plugin_manager.all_plugins_config
 
         for plugin_name, plugin_config in all_plugins_config.items():
-            
             # 创建并添加插件列表项
             item = PluginListWidgetItem(plugin_name, plugin_config)
+            item.signals.config_changed.connect(self.on_plugin_changed) # 监听配置变更
             self.plugin_list.addItem(item)
             self.plugin_items[plugin_name] = item
         
@@ -79,36 +104,73 @@ class PluginManagerWidget(QWidget):
             self.plugin_list.setCurrentRow(0)
     
     def on_plugin_selected(self, current_item, previous):
-        """处理插件列表选择时的详情界面变更"""
-        if not current_item:
-            self.detail_widget.clear()
+        """处理插件列表选择变更"""
+        if isinstance(current_item, PluginListWidgetItem):
+            self.current_plugin_item = current_item
+            self.display_plugin_details(current_item)
+            self.update_save_button()
+    
+    def display_plugin_details(self, plugin_item:PluginListWidgetItem):
+        """显示插件详情"""
+        if not plugin_item:
+            self.clear_detail_form()
             return
             
-        if isinstance(current_item, PluginListWidgetItem):
-            self.detail_widget.display_plugin(current_item)
-            
-            # 检查是否有未保存的修改来更新保存按钮状态
-            self.update_save_button()
+        # 清除现有表单
+        self.clear_detail_form()
+        
+        # 使用插件项生成详情视图并更新UI控件 
+        controls = plugin_item.generate_detail_view(self.form_layout)
+        
+        # 使用插件项更新UI控件状态
+        plugin_item.update_ui_controls(self.detail_title, self.toggle_btn)
+        
+        # 显示表单
+        self.settings_form.show()
+        self.toggle_btn.show()
     
-    def on_plugin_changed(self, plugin_name, changes):
+    def clear_detail_form(self):
+        """清除详情表单"""
+        # 清除表单内容
+        while self.form_layout.rowCount() > 0:
+            self.form_layout.removeRow(0)
+        
+        # 删除不必要的字段清理
+        
+        # 隐藏组件
+        self.settings_form.hide()
+        self.toggle_btn.hide()
+        
+        # 重置标题
+        self.detail_title.setText("选择插件查看详情")
+    
+    def on_plugin_changed(self, plugin_name):
         """处理插件配置变更"""
-        if plugin_name in self.plugin_items:
-            item = self.plugin_items[plugin_name]
-            item.update_config(changes)
-            
-            # 更新保存按钮状态
-            self.update_save_button()
+        # 更新保存按钮状态
+        self.update_save_button()
+        
+        # 更新UI状态
+        if self.current_plugin_item and self.current_plugin_item.plugin_name == plugin_name:
+            # 使用插件项更新UI控件状态
+            self.current_plugin_item.update_ui_controls(self.detail_title, self.toggle_btn)
     
     def update_save_button(self):
-        """更新保存按钮的状态"""
+        """更新保存按钮状态"""
+        # 检查是否有未保存的修改
         has_changes = any(item.has_pending_changes() for item in self.plugin_items.values())
         self.save_btn.setEnabled(has_changes)
+        
         if has_changes:
             self.save_btn.setText("保存修改")
             self.save_btn.setStyleSheet("background-color: #FFCCCB;")  # 浅红色背景表示有未保存修改
         else:
             self.save_btn.setText("保存设置")
             self.save_btn.setStyleSheet("")
+    
+    def toggle_plugin(self):
+        """切换插件启用状态"""
+        if self.current_plugin_item and self.current_plugin_item.is_load:
+            self.current_plugin_item.update_config(enable=not self.current_plugin_item.enable)
     
     def save_plugin_settings(self):
         """保存所有插件设置到配置文件"""
@@ -118,65 +180,44 @@ class PluginManagerWidget(QWidget):
             if not config:
                 QMessageBox.warning(self, "读取失败", "无法读取配置文件")
                 return
-                
-            # 2. 收集所有插件的待保存修改
+            
+            # 2. 应用所有插件的未保存修改
             any_changes = False
-            
             for plugin_name, item in self.plugin_items.items():
                 if item.has_pending_changes():
-                    any_changes = True
-                    changes = item.get_pending_changes()
-                    
-                    # 更新配置
-                    if plugin_name not in config:
-                        continue
-                    
-                    # 处理基本设置
-                    if 'is_load' in changes:
-                        config[plugin_name]["is_load"] = changes['is_load']
+                    if item.apply_changes_to_config(config):
+                        any_changes = True
                         
-                    if 'enable' in changes:
-                        config[plugin_name]["enable"] = changes['enable']
-                    
-                    # 处理参数修改
-                    if 'parameters' in changes:
-                        # 更新参数值
-                        for param_name, param_value in changes['parameters'].items():
-                            for i, param in enumerate(config[plugin_name]["parameters"]):
-                                if param.get('name') == param_name:
-                                    config[plugin_name]["parameters"][i]['default'] = param_value
-                                    break
-            
-            if not any_changes:
-                QMessageBox.information(self, "提示", "没有发现需要保存的修改")
-                return
-            
-            # 3. 将配置写入文件
-            self.write_config_file(config)
-            
-            # 4. 更新插件对象（如果已加载）
-            for plugin_name, item in self.plugin_items.items():
-                if item.has_pending_changes():
-                    changes = item.get_pending_changes()
+                    # 更新插件对象（如果已加载）
                     plugin = self.plugin_manager.plugins.get(plugin_name)
-                    
                     if plugin:
-                        # 更新插件对象属性
+                        # 获取修改内容
+                        changes = item.get_pending_changes()
+                        
+                        # 更新启用状态
                         if 'enable' in changes:
                             plugin.enable = changes['enable']
                         
                         # 更新参数
                         if 'parameters' in changes:
-                            for param_name, param_value in changes['parameters'].items():
+                            for param_name, param_value in changes:
                                 for param in plugin.parameters:
                                     if param.get('name') == param_name:
                                         param['default'] = param_value
                                         break
-                    
-                    # 清除待保存的修改
-                    item.clear_pending_changes()
             
-            # 5. 重置UI状态
+            if not any_changes:
+                QMessageBox.information(self, "提示", "没有发现需要保存的修改")
+                return
+            
+            # 3. 将更新后的配置写入文件
+            self.write_config_file(config)
+            
+            # 4. 清除所有未保存的修改
+            for item in self.plugin_items.values():
+                item.clear_pending_changes()
+            
+            # 5. 更新UI
             self.update_save_button()
             
             # 6. 显示成功消息
@@ -215,7 +256,6 @@ class PluginManagerWidget(QWidget):
     
     def import_plugin(self):
         """导入外部插件"""
-        # 这里仅为界面演示，实际需要实现插件导入逻辑
         file_path, _ = QFileDialog.getOpenFileName(
             self, "选择插件文件", "", "Python文件 (*.py)"
         )

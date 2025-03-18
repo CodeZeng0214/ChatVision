@@ -4,4 +4,3 @@ ChatVision GUI模块
 """
 
 from gui.PluginListWidgetItem import PluginListWidgetItem
-from gui.PluginDetailWidget import PluginDetailWidget

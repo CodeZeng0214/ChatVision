@@ -1,0 +1,71 @@
+{
+    "ObjectDetect": {
+        "enable": true,
+        "module_path": "tasks.YOLOTasks",
+        "class_name": "ObjDetectYOLOTask",
+        "description": "使用YOLO进行图像物体检测。",
+        "parameters": [
+            {
+                "name": "image_path",
+                "description": "待检测的图像路径",
+                "required": true
+            },
+            {
+                "name": "weight_path",
+                "description": "YOLO权重路径",
+                "required": false,
+                "default": ".//weights//YOLO_World//yolov8s-worldv2.pt"
+            },
+            {
+                "name": "is_show",
+                "description": "是否显示检测结果",
+                "required": false,
+                "default": false
+            }
+        ]
+    },
+    "HumanPoseEstimate": {
+        "enable": true,
+        "module_path": "tasks.YOLOTasks",
+        "class_name": "HummanPoseTrackYOLOTask",
+        "description": "使用YOLO进行人体姿态跟踪。",
+        "parameters": [
+            {
+                "name": "image_path",
+                "description": "待检测的图像路径",
+                "required": true
+            },
+            {
+                "name": "weight_path",
+                "description": "YOLO权重路径，文件类型为.pt",
+                "required": false,
+                "default": "tasks/weights/yolov5s.pt"
+            },
+            {
+                "name": "is_show",
+                "description": "是否显示检测结果",
+                "required": false,
+                "default": true
+            }
+        ]
+    },
+    "ImageDescription": {
+        "enable": false,
+        "module_path": "tasks.BLIPTasks",
+        "class_name": "ImgDescriptionTask",
+        "description": "使用BLIP进行图像描述。",
+        "parameters": [
+            {
+                "name": "image_path",
+                "description": "待描述的图像路径",
+                "required": true
+            },
+            {
+                "name": "weight_path",
+                "description": "BLIP权重路径，文件类型为.pt",
+                "required": false,
+                "default": "tasks/weights/blip.pt"
+            }
+        ]
+    }
+}
