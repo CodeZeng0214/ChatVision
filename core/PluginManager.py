@@ -35,20 +35,6 @@ class PluginManager:
             # 如果加载失败，尝试扫描并创建默认配置
             self.discover_new_plugin_classes()
             self.load_plugins_from_config(self.plugins_config_path)
-            
-    def read_config_from_file(self, plugins_config_path: str) -> Dict[str, Dict[str, Any]]:
-        """读取插件配置文件\n
-        参数：\n
-        - plugins_config_path: str 插件配置文件路径(优先使用传入的路径，否则使用默认路径)\n
-        返回：Dict[str, Dict[str, Any]] 插件配置字典
-        """
-        plugins_config_path = plugins_config_path or self.plugins_config_path 
-        try:
-            with open(plugins_config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"读取插件配置失败，返回空子典: {e}")
-            return {}
     
     def discover_new_plugin_classes(self, new_plugins_path: str='plugins') -> int:
         """扫描插件模块目录，发现新的Plugin子类并添加到配置文件（扫描的时候导入了插件自身依赖的模块）\n
@@ -160,12 +146,17 @@ class PluginManager:
     
     def write_config_to_file(self, plugins_config_path: str = None, plugins_config: Dict[str, Dict[str, Any]] = None):
         """将插件配置写入配置文件，覆盖原有配置"""
+        # 判断传入的配置信息数量是否正确
+        if len(plugins_config) != len(self.all_plugins_config):
+            print("传入的配置信息数量不正确，写入失败")
+            return False
+        
+        plugins_config_path = plugins_config_path or self.plugins_config_path
         # 确保配置文件目录存在
         os.makedirs(os.path.dirname(plugins_config_path), exist_ok=True)
-
         # 使用传入的配置或当前配置
         plugins_config = plugins_config or self.all_plugins_config
-        plugins_config_path = plugins_config_path or self.plugins_config_path
+        
         # 写入文件（清空了原配置文件）
         try:
             with open(plugins_config_path, 'w', encoding='utf-8') as f:
@@ -175,6 +166,20 @@ class PluginManager:
             print(f"文件操作失败: {e}")
         except TypeError as e:
             print(f"数据序列化失败: {e}")
+          
+    def read_config_from_file(self, plugins_config_path: str=None) -> Dict[str, Dict[str, Any]]:
+        """读取插件配置文件\n
+        参数：\n
+        - plugins_config_path: str 插件配置文件路径(优先使用传入的路径，否则使用默认路径)\n
+        返回：Dict[str, Dict[str, Any]] 插件配置字典
+        """
+        plugins_config_path = plugins_config_path or self.plugins_config_path 
+        try:
+            with open(plugins_config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"读取插件配置失败，返回空子典: {e}")
+            return {}
     
     def describe_plugins(self) -> str:
         """生成所有插件的描述"""
@@ -183,7 +188,32 @@ class PluginManager:
             if plugin.enable:
                 descriptions.append(plugin.describe_plugin())
         return "The following are the supported plugins and their parameters:\n" + "\n".join(descriptions)
-        
+    
+    def update_plugin_config(self, plugin_name: str, changes: Dict[str, Any]) -> bool:
+        """更新指定插件的配置\n
+        参数：\n
+        - plugin_name: str 插件名称\n
+        - parameters: Dict[str, Any] 新的参数\n
+        返回：bool 是否更新成功
+        """
+        plugin = self.plugins.get(plugin_name)
+        if plugin:
+            
+            # 更新启用状态
+            if 'enable' in changes:
+                plugin.enable = changes['enable']
+            
+            # 更新参数
+            if 'parameters' in changes:
+                for param_name, param_value in changes['parameters'].items():
+                    for param in plugin.parameters:
+                        if param.get('name') == param_name:
+                            param['default'] = param_value
+                            break
+            return True
+        return False
+    
+    
     # 获取插件
     def GetPlugin(self, plugin_name):
         """获取插件"""
