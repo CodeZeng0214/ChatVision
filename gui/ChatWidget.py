@@ -91,7 +91,7 @@ class ChatWidget(QWidget):
         # 添加侧边栏切换按钮
         self.sidebar_btn = QPushButton("⬅️打开侧边栏")
         #self.sidebar_btn.setFixedSize(30, 30)
-        self.sidebar_btn.clicked.connect(self.toggleSidebar)
+        self.sidebar_btn.clicked.connect(self.toggle_sidebar)
         chat_layout.addWidget(self.sidebar_btn)
         chat_layout.setAlignment(self.sidebar_btn, Qt.AlignRight | Qt.AlignTop)
         
@@ -105,10 +105,11 @@ class ChatWidget(QWidget):
     def connect_signals(self):
         """连接信号和槽"""
         # 连接ChatRobot的信号
+        self.chat_robot.response_ready.connect(self.add_message_to_list)
         self.chat_robot.parameters_needed.connect(self.show_parameter_form)
         self.chat_robot.processing_plugin.connect(self.show_processing_status)
         self.chat_robot.plugin_completed.connect(self.show_plugin_result)
-        self.chat_robot.stream_content.connect(self.update_stream_content)
+        self.chat_robot.stream_content.connect(self.response_stream)
         
         # 连接参数表单的信号
         self.param_widget.parameters_ready.connect(self.handle_parameters)
@@ -125,12 +126,12 @@ class ChatWidget(QWidget):
     
     def add_message_to_list(self, text, image_path="", is_user=True):
         """向消息列表中添加一条消息并返回列表项"""
-        message_item = MessageItem(text, image_path, is_user=is_user)
-        list_item = QListWidgetItem(self.message_list)
-        list_item.setSizeHint(message_item.sizeHint())
-        self.message_list.addItem(list_item)
-        self.message_list.setItemWidget(list_item, message_item)
-        self.message_list.scrollToBottom()
+        message_item = MessageItem(text, image_path, is_user=is_user) # 创建消息气泡(图窗)
+        list_item = QListWidgetItem(self.message_list) # 创建列表项
+        list_item.setSizeHint(message_item.sizeHint()) # 设置列表项尺寸和消息气泡一致
+        self.message_list.addItem(list_item) # 添加列表项
+        self.message_list.setItemWidget(list_item, message_item) # 设置列表项的部件为消息气泡
+        self.message_list.scrollToBottom() # 滚动到底部
         return list_item
     
     def send_message(self):
@@ -147,19 +148,17 @@ class ChatWidget(QWidget):
             message_text = f"{message_text}\n[图片路径: {self.selected_file_path}]"
             # 设置原始图片到侧边栏
             self.sidebar.set_original_image(self.selected_file_path)
-            # 显示侧边栏
-            self.showSidebar()
+            # # 显示侧边栏
+            # self.showSidebar()
         
         # 清空输入框和文件选择
         self.input_text.clear()
-        file_path = self.selected_file_path
         self.selected_file_path = ""
         self.file_label.setText("未选择文件")
         
         # 添加AI思考中的消息
         self.current_response_item = self.add_message_to_list("思考中...", "", is_user=False)
-        self.current_response_content = ""
-        
+
         # 在新线程中处理消息
         threading.Thread(target=self._process_message_in_thread, 
                         args=(message_text,), daemon=True).start()
@@ -167,17 +166,17 @@ class ChatWidget(QWidget):
     def _process_message_in_thread(self, message_text):
         """在新线程中处理消息"""
         try:
+            self.current_response_content = "" # 用于存储流式回复的内容
             # 异步发送消息到ChatRobot
             self.chat_robot.ChatFrame(message_text)
-            # 注意：不需要在这里更新UI，因为ChatRobot会通过信号触发UI更新
+            # ChatRobot会通过信号触发UI更新
         except Exception as e:
             error_message = f"处理消息时发生错误: {e}"
             # 发送错误信号到信息列表
             self.add_message_to_list(error_message)
             
-    
     @Slot(str)
-    def update_stream_content(self, content):
+    def response_stream(self, content):
         """更新流式内容到聊天窗口"""
         # 追加内容到当前回复
         self.current_response_content += content
@@ -207,10 +206,10 @@ class ChatWidget(QWidget):
                 self.message_list.setItemWidget(last_item, new_item)
     
     @Slot(str, str)
-    def show_plugin_result(self, plugin_type, image_path):
+    def show_plugin_result(self, plugin_name, image_path):
         """显示插件处理结果"""
         # 显示侧边栏
-        self.showSidebar()
+        self.show_sidebar()
         
         # 设置原始图片
         self.sidebar.set_original_image(image_path)
@@ -224,17 +223,19 @@ class ChatWidget(QWidget):
     @Slot(dict)
     def handle_parameters(self, parameters):
         """处理用户填写的参数并继续任务"""
-        self.chat_robot.set_parameters(parameters)
+        for param_name, param_value in parameters.items():
+            self.chat_robot.current_plugin_params[param_name] = param_value
+        self.chat_robot.waiting_for_params = False
     
-    def toggleSidebar(self):
+    def toggle_sidebar(self):
         """按钮切换侧边栏显示状态"""
         if self.sidebar.isVisible():
-            self.closeSidebar()
+            self.close_sidebar()
         else:
             # 显示侧边栏，并设置合适的宽度
-            self.showSidebar()
+            self.show_sidebar()
     
-    def showSidebar(self):
+    def show_sidebar(self):
         """"显示侧边栏, 并设置合适的宽度"""
         self.sidebar.show()
         self.sidebar_btn.setText("➡️关闭侧边栏")
@@ -244,13 +245,9 @@ class ChatWidget(QWidget):
         sidebar_width = self.splitter.width() - chat_width
         self.splitter.setSizes([chat_width, sidebar_width])
         
-    def closeSidebar(self):
+    def close_sidebar(self):
         """隐藏侧边栏"""
         self.sidebar.hide()
         self.sidebar_btn.setText("⬅️打开侧边栏")
         # 重置分割器尺寸，聊天区域占满
         self.splitter.setSizes([self.width(), 0])
-    
-    def getPluginManager(self):
-        """获取聊天机器人的插件管理器"""
-        return self.chat_robot.plugin_manager

@@ -10,6 +10,7 @@ from core.ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from core.PluginManager import PluginManager # 导入插件管理器
 from core.Plugin import Plugin # 导入插件基类
 import threading  # 导入threading模块
+from time import sleep as wait
 
 ### 全局参数
 # CHAT_INTER = ChatGPT() # 聊天接口
@@ -53,6 +54,7 @@ class ChatRobot(QObject):
         self._analyse_messages = [] # 分析用户意图的消息流
         self.plugin_manager = PluginManager() # 实例化一个插件管理器
         self.current_plugin = None  # 当前处理的插件
+        self.current_plugin_params = None  # 当前处理的插件参数
         self.waiting_for_params = False  # 是否等待参数
 
 
@@ -62,12 +64,12 @@ class ChatRobot(QObject):
         主处理逻辑：从用户输入到插件结果返回。\n
         输入参数，即用户的问题输入
         """
+        #print(f"用户: {question}")
+        self.messages.append({"role": "user", "content": question})
         try:
-            #print(f"用户: {question}")
-            self.messages.append({"role": "user", "content": question})
-            
             # 使用 语言大模型 分析用户输入意图
             plugin_info = self._AnalyInput(question)
+            if plugin_info == "MAX": return "error: 尝试次数超过最大值"
             
             # 如果用户输入匹配不到插件则正常调用聊天接口
             if plugin_info == "General": 
@@ -80,55 +82,40 @@ class ChatRobot(QObject):
                 return response
                 
             # 获取插件名称和参数
-            plugin_name = plugin_info['plugin_name']
-            plugin_params = plugin_info['parameters']
+            current_plugin_name = plugin_info['plugin_name']
+            self.current_plugin_params = plugin_info['parameters']
             
+            # 检查插件的存在性
+            self.check_plugin(current_plugin_name)
+            if self.current_plugin == False:
+                return f"未知插件类型：{current_plugin_name}" 
+
             # 检查是否缺少必要参数
-            plugin = self.plugin_manager.GetPlugin(plugin_name)
-            if not plugin:
-                response = f"未知插件类型：{plugin_name}"
-                if HAS_PYSIDE:
-                    self.response_ready.emit(response)
-                return response
-                
-            required_params = [p for p in plugin.parameters if p.get("required", False)]
-            missing_params = []
-            
-            for param in required_params:
-                if param["name"] not in plugin_params:
-                    missing_params.append(param)
-            
-            # 如果缺少必要参数，通知GUI
-            if missing_params:
-                self.current_plugin = plugin_name
-                self.waiting_for_params = True
-                if HAS_PYSIDE:
-                    self.parameters_needed.emit(required_params)
-                missing_message = f"需要提供以下参数：{', '.join([p['name'] for p in missing_params])}"
-                print(missing_message)
-                return missing_message
+            self.check_params()
                 
             # 查找并执行插件
-            plugin_callable = plugin.execute
+            plugin_callable = self.current_plugin.execute
             
             # 通知GUI插件开始处理
             if HAS_PYSIDE:
-                self.processing_plugin.emit(f"正在执行{plugin_name}插件...")
+                self.processing_plugin.emit(f"正在执行{current_plugin_name}插件...")
             
             # 执行插件
-            plugin_results = plugin_callable(plugin_params)
+            plugin_results = plugin_callable(self.current_plugin_params)
             
             # 通知插件已完成
-            if "image_path" in plugin_params and HAS_PYSIDE:
-                self.plugin_completed.emit(plugin_name, plugin_params["image_path"])
+            if "image_path" in self.current_plugin_params and HAS_PYSIDE:
+                self.plugin_completed.emit(self.current_plugin, self.current_plugin_params["image_path"])
+            
+            self.refresh() # 刷新当前处理的插件和参数
             
             # 用 GPT 根据结果生成自然语言回复
-            result_summary = f"插件类型：{plugin_name}\n插件结果：{plugin_results}"
+            result_summary = f"插件类型：{current_plugin_name}\n插件结果：{plugin_results}"
             response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
                                         + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
                                         + question}], self._stream_callback if HAS_PYSIDE else None)
             self.messages.append({"role": "assistant", "content": response})
-            if HAS_PYSIDE:
+            if HAS_PYSIDE and not response:
                 self.response_ready.emit(response)
             return response
         except Exception as e:
@@ -138,6 +125,51 @@ class ChatRobot(QObject):
                 self.response_ready.emit(error_message)
             return error_message
 
+    def refresh(self):
+        """刷新当前处理的插件和参数"""
+        self.current_plugin = None
+        self.current_plugin_params = None
+        self.waiting_for_params = False
+        
+    def check_plugin(self, plugin_name)->bool:
+        """检查插件是否存在"""
+        self.current_plugin = self.plugin_manager.GetPlugin(plugin_name)
+        if not self.current_plugin:
+            response = f"未知插件类型：{plugin_name}"
+            if HAS_PYSIDE:
+                self.response_ready.emit(response)
+            return False
+        return True
+
+    def check_params(self)->dict:
+        """检查插件参数是否完整"""
+        required_params = [p for p in self.current_plugin.parameters if p.get("required", False)]
+        missing_params = [] # 缺少的参数列表
+        
+        for param in required_params:
+            if param["name"] not in missing_params:
+                missing_params.append(param) 
+        
+        # 如果缺少必要参数，通知GUI
+        if missing_params:
+            self.waiting_for_params = True
+ 
+            if HAS_PYSIDE:
+                self.parameters_needed.emit(missing_params)
+            missing_message = f"需要提供以下参数：{', '.join([p['name'] for p in missing_params])}"
+            print(missing_message)
+            
+            # 等待参数输入
+            while self.waiting_for_params:
+                wait(0.3)
+                
+            # 控制台模式：如果缺少参数，等待参数输入
+            if not HAS_PYSIDE:
+                for param in missing_params:
+                    input_value = input(f"请输入参数值param['name']：")
+                    self.current_plugin_params[param['name']] = input_value
+            return True
+    
     def _AnalyInput(self, user_input):
         """
         使用 大语言模型接口 分析用户输入并提取插件信息。
@@ -211,63 +243,8 @@ class ChatRobot(QObject):
         """处理流式内容的回调函数"""
         if HAS_PYSIDE:
             self.stream_content.emit(content)
-    
-    def set_parameters(self, parameters):
-        """设置参数并继续执行插件"""
-        if not self.waiting_for_params or not self.current_plugin:
-            return False
             
-        plugin = self.plugin_manager.GetPlugin(self.current_plugin)
-        if not plugin:
-            return False
             
-        # 通知GUI插件开始处理
-        if HAS_PYSIDE:
-            self.processing_plugin.emit(f"正在执行{self.current_plugin}插件...")
-        
-        # 保存当前状态供线程使用
-        current_plugin = self.current_plugin
-        last_question = self.messages[-1]["content"] if self.messages else ""
-        
-        # 重置状态，避免重复触发处理
-        self.waiting_for_params = False
-        self.current_plugin = None
-        
-        # 在新线程中执行插件
-        threading.Thread(
-            target=self._execute_plugin_in_thread, 
-            args=(plugin, parameters, current_plugin, last_question),
-            daemon=True
-        ).start()
-        
-        return True
-
-    def _execute_plugin_in_thread(self, plugin, parameters, plugin_name, last_question):
-        """在新线程中执行插件处理"""
-        try:
-            # 执行插件
-            plugin_results = plugin.execute(parameters)
-            
-            # 通知插件已完成
-            if "image_path" in parameters and HAS_PYSIDE:
-                self.plugin_completed.emit(plugin_name, parameters["image_path"])
-            
-            # 用 GPT 根据结果生成自然语言回复
-            result_summary = f"插件类型：{plugin_name}\n插件结果：{plugin_results}"
-            response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
-                                    + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
-                                    + last_question}], self._stream_callback if HAS_PYSIDE else None)
-            
-            self.messages.append({"role": "assistant", "content": response})
-            if HAS_PYSIDE:
-                self.response_ready.emit(response)
-        except Exception as e:
-            error_message = f"处理插件参数时发生错误: {e}"
-            print(error_message)
-            if HAS_PYSIDE:
-                self.response_ready.emit(error_message)
-
-    
 if __name__ == '__main__':
         
     chat_robot = ChatRobot()
