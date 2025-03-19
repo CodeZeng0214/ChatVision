@@ -2,7 +2,6 @@
 
 import time
 from PIL import Image
-from transformers import BlipProcessor, BlipForConditionalGeneration
 from core.Plugin import Plugin
 
 #@ 待实现 考虑将用户的问题转化为英文作为参数传入
@@ -18,21 +17,25 @@ class ImgDescriptionPlugin(Plugin):
     参数：{'image_path': str, 'weight_path': str (可选)}\n
     """
     def __init__(self):
+        from transformers import BlipProcessor, BlipForConditionalGeneration
+        
         super().__init__('ImageDescription', 
                         "使用BLIP进行图像描述。",
                          [{'name': 'image_path', 'description': '待描述的图像路径', 'required': True},
                           {'name': 'weight_path', 'description': 'BLIP权重路径', 'required': False, 'default': BLIP_PATH}])
-        self.execute = self.ImgDescription
+        self.execute = self.imageDescription
     
     # 图像描述
-    def ImgDescription(self, params):
+    def imageDescription(self, params):
         """
         图像描述插件实现。\n
         参数：{'image_path': str, 'weight_path': str (可选)}\n
         """
+        from transformers import BlipProcessor, BlipForConditionalGeneration
+        
         blip_path = params.get('weight_path', BLIP_PATH)
         image_path = params['image_path']
-
+        
         start_time = time.time()
 
         # 本地模型

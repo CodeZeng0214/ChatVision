@@ -9,7 +9,12 @@
 from core.ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from core.PluginManager import PluginManager # 导入插件管理器
 from core.Plugin import Plugin # 导入插件基类
-import threading  # 确保导入threading模块
+import threading  # 导入threading模块
+
+### 全局参数
+# CHAT_INTER = ChatGPT() # 聊天接口
+INIT_MESSAGE = "You are a chatbot capable of image recognition " # 初始化消息
+ATT_MAX = 3 # 尝试分析用户意图并转化成json格式的最大次数
 
 # 条件导入PySide6，当此脚本不是启动脚本时导入
 if __name__ != '__main__':
@@ -34,17 +39,18 @@ class ChatRobot(QObject):
     plugin_completed = Signal(str, str) if HAS_PYSIDE else None  # 插件完成时的信号
     stream_content = Signal(str) if HAS_PYSIDE else None  # 流式内容更新信号
 
-    def __init__(self, chat_inter=ChatGPT(), init_message="你是一个能够进行图像识别的聊天机器人."):
+    def __init__(self, chat_inter=ChatGPT(), init_message=INIT_MESSAGE):
         """
         可选参数：\n
         -chat_inter 与语言模型通讯的聊天接口，默认为ChatGPT
-        init_message 初始化内容，默认"你是一个能够进行图像识别的聊天机器人."
+        init_message "You are a chatbot capable of image recognition " 初始化消息"
         """
         if HAS_PYSIDE:
             super().__init__()
         
         self.chat_inter = chat_inter
         self.messages = [{"role": "system", "content": init_message}]
+        self._analyse_messages = [] # 分析用户意图的消息流
         self.plugin_manager = PluginManager() # 实例化一个插件管理器
         self.current_plugin = None  # 当前处理的插件
         self.waiting_for_params = False  # 是否等待参数
@@ -59,12 +65,9 @@ class ChatRobot(QObject):
         try:
             #print(f"用户: {question}")
             self.messages.append({"role": "user", "content": question})
-
-            # 告知 语言大模型 支持的插件的 提示模板
-            plugin_descriptions = self.plugin_manager.describe_plugins()
-
+            
             # 使用 语言大模型 分析用户输入意图
-            plugin_info = self._AnalyInput(question, plugin_descriptions)
+            plugin_info = self._AnalyInput(question)
             
             # 如果用户输入匹配不到插件则正常调用聊天接口
             if plugin_info == "General": 
@@ -77,13 +80,13 @@ class ChatRobot(QObject):
                 return response
                 
             # 获取插件名称和参数
-            plugin_type = plugin_info['plugin_type']
+            plugin_name = plugin_info['plugin_name']
             plugin_params = plugin_info['parameters']
             
             # 检查是否缺少必要参数
-            plugin = self.plugin_manager.GetPlugin(plugin_type)
+            plugin = self.plugin_manager.GetPlugin(plugin_name)
             if not plugin:
-                response = f"未知插件类型：{plugin_type}"
+                response = f"未知插件类型：{plugin_name}"
                 if HAS_PYSIDE:
                     self.response_ready.emit(response)
                 return response
@@ -97,7 +100,7 @@ class ChatRobot(QObject):
             
             # 如果缺少必要参数，通知GUI
             if missing_params:
-                self.current_plugin = plugin_type
+                self.current_plugin = plugin_name
                 self.waiting_for_params = True
                 if HAS_PYSIDE:
                     self.parameters_needed.emit(required_params)
@@ -110,17 +113,17 @@ class ChatRobot(QObject):
             
             # 通知GUI插件开始处理
             if HAS_PYSIDE:
-                self.processing_plugin.emit(f"正在执行{plugin_type}插件...")
+                self.processing_plugin.emit(f"正在执行{plugin_name}插件...")
             
             # 执行插件
             plugin_results = plugin_callable(plugin_params)
             
             # 通知插件已完成
             if "image_path" in plugin_params and HAS_PYSIDE:
-                self.plugin_completed.emit(plugin_type, plugin_params["image_path"])
+                self.plugin_completed.emit(plugin_name, plugin_params["image_path"])
             
             # 用 GPT 根据结果生成自然语言回复
-            result_summary = f"插件类型：{plugin_type}\n插件结果：{plugin_results}"
+            result_summary = f"插件类型：{plugin_name}\n插件结果：{plugin_results}"
             response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
                                         + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
                                         + question}], self._stream_callback if HAS_PYSIDE else None)
@@ -135,10 +138,12 @@ class ChatRobot(QObject):
                 self.response_ready.emit(error_message)
             return error_message
 
-    def _AnalyInput(self, user_input, plugin_descriptions):
+    def _AnalyInput(self, user_input):
         """
         使用 大语言模型接口 分析用户输入并提取插件信息。
         """
+        # 告知 语言大模型 支持的插件的 提示模板
+        plugin_descriptions = self.plugin_manager.describe_plugins()
         template = f"""
         You're a plugin analysis assistant. When a user enters a question, 
         match the most suitable plugin according to the following supported plugins,
@@ -146,7 +151,7 @@ class ChatRobot(QObject):
         {plugin_descriptions}
         Only Return format:
         {{
-            "plugin_type": <plugin type>,
+            "plugin_name": <plugin name>,
             "parameters": <parameter dictionary>
         }}
         Hint: 
@@ -155,41 +160,52 @@ class ChatRobot(QObject):
         3. If the user intends to use a plugin, but the parameter "required" is "True" is missing, do not write this parameter in the return information.
         
         An example of a user entering correct parameters:
-            User enters: "D:\Code\ChatVision\photos\\bus.jpg", what is on this picture"
+            User enters: "D:\Code\ChatVision\photos\\bus.jpg", what is on this picture, please display on the screen "
             Your answer: {{
-                "plugin_type": "ObjectDetect",
+                "plugin_name": "ObjectDetect",
                 "parameters": {{
                 "image_path": "D:\\\\Code\\\\ChatVision\\\\photos\\\\bus.jpg"  
+                "is_show": True
                 }}
             }}
         An example of insufficient user input parameters:
            User enters: what is on this picture
             Your answer: {{
-                "plugin_type": "ObjectDetect",
+                "plugin_name": "ObjectDetect",
                 "parameters": {{ 
                 }}
             }}
         User input is as follows: 
         {user_input}
         """
-        messages = [{"role": "system", "content": "You're a plugin extraction assistant."},
-                    {"role": "user", "content": template}]
-        plugin_info = self.chat_inter.UnstreamResponse(messages)
+        message = {"role": "user", "content": template}
         
-        # print(plugin_info)
-        if plugin_info == "General" : return "General"
-        
-        # 格式转化
-        try: 
-            plugin_info = eval(plugin_info)
-            # 兼容旧版本返回格式（task_type -> plugin_type）
-            if "task_type" in plugin_info and "plugin_type" not in plugin_info:
-                plugin_info["plugin_type"] = plugin_info.pop("task_type")
-        except Exception as e:
-            print(f"返回的内容格式不正确: {e}")
-            return "General"
-        else:
-            return plugin_info
+        self._analyse_messages.clear() # 清空上一次的分析消息流
+        self._analyse_messages.append({"role": "system", "content": "You're a plugin extraction assistant."})
+        self._analyse_messages.append(message)
+        plugin_info = None
+        attempt_count = 0 # 尝试分析用户意图并转化成json格式的次数
+        while not plugin_info:
+            plugin_info = self.chat_inter.UnstreamResponse(self._analyse_messages)
+            attempt_count += 1
+            if plugin_info == "General": 
+                # 如果用户输入匹配不到插件则正常调用聊天接口
+                return "General" 
+            if attempt_count >= ATT_MAX:
+                print("error: 尝试次数超过最大值")
+                return "MAX"
+            # 格式转化
+            try: 
+                # print(f"第{attempt_count}次尝试转化用户意图为json格式: {plugin_info}")
+                plugin_info = eval(plugin_info)
+            except Exception as e:
+                error_message = f"第{attempt_count}次尝试转化失败，可能是格式不正确: {e}"
+                print(error_message)
+                self._analyse_messages.append[{"role": "user", "content": f"These are the questions you need to answer in the format:\n{template}\n"
+                                               + f"The following is the message returned after the last processing failure：{plugin_info}"
+                                               + f"\nError message: {error_message}"}]
+                continue
+        return plugin_info
     
     def _stream_callback(self, content):
         """处理流式内容的回调函数"""

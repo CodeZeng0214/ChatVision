@@ -6,6 +6,7 @@ import os
 ### ========== 全局参数 ========== ###
 DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类插件的权重路径
 POSE_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的人体姿态估计类插件的权重路径
+RESULT_PATH = ".//results//YOLO" # 默认的检测结果保存路径
 
 
 ### ========== 具体实现 ========== ###
@@ -13,33 +14,44 @@ POSE_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的人体姿态估
 class ObjDetectYOLOPlugin(Plugin):
     """
     图像物体检测插件实现。\n
-    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
 
     def __init__(self):
+        from ultralytics import YOLO
+        
         super().__init__('ObjectDetect', 
                         "使用YOLO进行图像物体检测。",
                          [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
                           {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False, 'default': DET_WEI_PATH},
-                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True}])
+                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True},
+                          {'name': 'is_save', 'description': '是否保存检测结果', 'required': False, 'default': False},
+                          {'name': 'save_path', 'description': '检测结果的保存路径', 'required': False, 'default': RESULT_PATH}])
         self.execute = self.objDetect
     
     # 图像物体识别（YOLO）
     def objDetect(self, params):
         """
         物体检测插件实现。\n
-        参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
+        参数: \n
+        'image_path':str (必选)\n
+        'weight_path':str (可选)\n
+        'is_show':bool (可选)\n
+        'is_save':bool (可选)\n
+        'result_path':str (可选)\n
         """
         from ultralytics import YOLO
+        
         image_path = params['image_path']
         weight_path = params.get('weight_path', DET_WEI_PATH)
         is_show = params.get('is_show', False)
+        is_save = params.get('is_save', False)
+        result_path = params.get('result_path', RESULT_PATH)
 
         # 加载 YOLO 模型
         model = YOLO(weight_path)
-        print("正在进行物体检测")
+        print("正在使用'YOLO'进行物体检测")
         results = model.predict(source=image_path, 
-                                save=False, save_txt=False, save_conf=False, project='./results',  
+                                save=is_save, save_txt=True, save_conf=True, project=result_path,  
                                 verbose=False, line_width=2)
         print("检测完成")
 
@@ -65,21 +77,29 @@ class ObjDetectYOLOPlugin(Plugin):
 class HummanPoseTrackYOLOPlugin(Plugin):
     """
     人体姿态跟踪插件实现。\n
-    参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
     """
     def __init__(self):
+        from ultralytics import YOLO
+        
         super().__init__('HumanPoseEstimate', 
                          "使用YOLO进行人体姿态跟踪。", 
-                         [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
-                          {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False, 'default': POSE_WEI_PATH},
-                          {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True}])
+                       [{'name': 'image_path', 'description': '待检测的图像路径', 'required': True},
+                        {'name': 'weight_path', 'description': 'YOLO权重路径', 'required': False, 'default': POSE_WEI_PATH},
+                        {'name': 'is_show', 'description': '是否显示检测结果', 'required': False, 'default': True},
+                        {'name': 'is_save', 'description': '是否保存检测结果', 'required': False, 'default': False},
+                        {'name': 'save_path', 'description': '检测结果的保存路径', 'required': False, 'default': RESULT_PATH}])
         self.execute = self.hummanPoseTrack
 
     # 人体姿态跟踪（YOLO）
     def hummanPoseTrack(self, params):
         """
         人体姿态跟踪插件实现。\n
-        参数：{'image_path': str, 'weight_path': str (可选), 'is_show': bool (可选)}\n
+        参数：\n
+        'image_path':str (必选)\n
+        'weight_path':str (可选)\n
+        'is_show':bool (可选)\n
+        'is_save':bool (可选)\n
+        'result_path':str (可选)\n
         """
         from ultralytics import YOLO
                 

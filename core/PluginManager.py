@@ -218,7 +218,6 @@ class PluginManager:
             return True
         return False
     
-    
     # 获取插件
     def GetPlugin(self, plugin_name):
         """获取插件"""
@@ -238,10 +237,6 @@ class PluginManager:
             return True
         return False
     
-    # 保存当前设置
-    def save_settings(self):
-        """保存当前插件设置到配置文件"""
-        self.write_config_to_file()
     
     # 获取所有可用插件配置（包括未加载的）
     def get_all_available_plugins(self):
