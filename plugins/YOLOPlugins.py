@@ -44,7 +44,7 @@ class ObjDetectYOLOPlugin(Plugin):
         image_path = params['image_path']
         weight_path = params.get('weight_path', DET_WEI_PATH)
         is_show = params.get('is_show', False)
-        is_save = params.get('is_save', False)
+        is_save = params.get('is_save', False) or is_show
         result_path = params.get('result_path', RESULT_PATH)
 
         # 加载 YOLO 模型
@@ -53,7 +53,9 @@ class ObjDetectYOLOPlugin(Plugin):
         results = model.predict(source=image_path, 
                                 save=is_save, save_txt=True, save_conf=True, project=result_path,  
                                 verbose=False, line_width=2)
+        
         print("检测完成")
+        if is_show: self.result = results[0].path
 
         # 格式化结果
         detection_results = ['检测到以下对象：']
@@ -68,7 +70,6 @@ class ObjDetectYOLOPlugin(Plugin):
                 cls = int(box.cls[0])  # 类别索引
                 label = model.names[cls]  # 获取类别名称
                 detection_result += f"检测到有一个{conf:.2f}%置信度的 {label} 对象\n"
-            if is_show: result.show(line_width=2)
             detection_results.append(detection_result)
         if is_show: detection_results.append("显示状态：检测结果已经显示于屏幕上")
         return '\n'.join(detection_results)

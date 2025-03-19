@@ -219,7 +219,7 @@ class PluginManager:
         return False
     
     # 获取插件
-    def GetPlugin(self, plugin_name):
+    def get_plugin(self, plugin_name):
         """获取插件"""
         plugin = self.plugins.get(plugin_name)
         if plugin and plugin.enable:
@@ -237,8 +237,7 @@ class PluginManager:
             return True
         return False
     
-    
     # 获取所有可用插件配置（包括未加载的）
-    def get_all_available_plugins(self):
+    def get_all_plugins_cofig(self):
         """获取配置中的所有插件配置信息（包括未加载的）"""
         return self.all_plugins_config

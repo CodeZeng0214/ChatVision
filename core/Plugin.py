@@ -85,3 +85,6 @@ class Plugin:
             "parameters": self.parameters
         }
 
+    def refresh(self):
+        """刷新插件的执行结果"""
+        self.result = None
