@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget, QVBoxLayout
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Slot, Signal
 from PySide6.QtGui import QIcon
 
 from gui.ChatWidget import ChatWidget
@@ -25,5 +25,17 @@ class MainWindow(QMainWindow):
         self.plugin_manager = PluginManagerWidget(self.chat_widget.chat_robot.plugin_manager)
         self.tabs.addTab(self.plugin_manager, "插件管理")
         
+        self.connect_signals() # 连接信号槽
+        
         # 状态栏
         self.statusBar().showMessage("就绪")
+        
+    def connect_signals(self):
+        """连接信号槽"""
+        # 聊天界面的状态消息连接到状态栏
+        self.chat_widget.status_message.connect(self.on_status_message)
+    
+    @Slot(str)
+    def on_status_message(self, message):
+        """状态消息槽函数"""
+        self.statusBar().showMessage(message)

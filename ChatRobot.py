@@ -34,11 +34,11 @@ else:
 ### ========== 聊天机器人类 ========== ###
 class ChatRobot(QObject):
     # 定义信号
-    response_ready = Signal(str) if HAS_PYSIDE else None  # 回复准备好时的信号
+    response_ready = Signal(str) if HAS_PYSIDE else None  # 回复信息准备好时的信号（不是完成回复）
     parameters_needed = Signal(list) if HAS_PYSIDE else None  # 需要参数时的信号
-    processing_plugin = Signal(str) if HAS_PYSIDE else None  # 处理插件时的信号
     plugin_completed = Signal() if HAS_PYSIDE else None  # 插件完成时的信号
     stream_content = Signal(str) if HAS_PYSIDE else None  # 流式内容更新信号
+
 
     def __init__(self, chat_inter=ChatGPT(), init_message=INIT_MESSAGE):
         """
@@ -54,7 +54,7 @@ class ChatRobot(QObject):
         self._analyse_messages = [] # 分析用户意图的消息流
         self.plugin_manager = PluginManager() # 实例化一个插件管理器
         self.current_plugin = None  # 当前处理的插件
-        self.current_plugin_params = None  # 当前处理的插件参数
+        self.current_plugin_params: dict = None  # 当前处理的插件的参数
         self.waiting_for_params = False  # 是否等待参数
 
     def refresh(self):
@@ -67,9 +67,6 @@ class ChatRobot(QObject):
         """检查插件是否存在"""
         self.current_plugin = self.plugin_manager.get_plugin(plugin_name)
         if not self.current_plugin:
-            response = f"未知插件类型：{plugin_name}"
-            if HAS_PYSIDE:
-                self.response_ready.emit(response)
             return False
         return True
 
@@ -193,12 +190,12 @@ class ChatRobot(QObject):
             # 如果用户输入匹配不到插件则正常调用聊天接口
             if plugin_info == "General": 
                 if HAS_PYSIDE:
-                    self.processing_plugin.emit("正在思考...")
+                    self.response_ready.emit("连接大模型中。。。")
                 # 使用回调函数处理流式内容
                 response = self.chat_inter.StreamResponse(self.messages, 
                                                          self._stream_callback if HAS_PYSIDE else None)
                 self.messages.append({"role": "assistant", "content": response})
-                return response
+                return True
                 
             # 获取插件名称和参数
             current_plugin_name = plugin_info['plugin_name']
@@ -207,7 +204,8 @@ class ChatRobot(QObject):
             # 检查插件的存在性
             self.check_plugin(current_plugin_name)
             if self.current_plugin == False:
-                return f"未知插件类型：{current_plugin_name}" 
+                self.response_ready.emit(f"未知插件类型：{current_plugin_name}")
+                return False
 
             # 检查是否缺少必要参数
             self.check_params()
@@ -217,10 +215,17 @@ class ChatRobot(QObject):
             
             # 通知GUI插件开始处理
             if HAS_PYSIDE:
-                self.processing_plugin.emit(f"正在执行{current_plugin_name}插件...")
+                self.response_ready.emit(f"正在执行{current_plugin_name}插件...")
             
             # 执行插件
-            plugin_results = plugin_callable(self.current_plugin_params)
+            try:
+                plugin_results = plugin_callable(self.current_plugin_params)
+            except Exception as e:
+                error_message = f"执行插件时发生错误: {e}"
+                print(error_message)
+                if HAS_PYSIDE:
+                    self.response_ready.emit(error_message)
+                raise
             
             # 通知插件已完成
             if HAS_PYSIDE:
@@ -228,22 +233,20 @@ class ChatRobot(QObject):
             
             # 用 GPT 根据结果生成自然语言回复
             result_summary = f"插件类型：{current_plugin_name}\n插件结果：{plugin_results}"
+            self.response_ready.emit("连接大模型中。。。")
             response = self.chat_inter.StreamResponse([{"role": "user", "content": result_summary 
                                         + "\n请你根据用户的问题内容，提取或者统计以上插件执行的结果信息来回答用户的问题(全部使用中文)：\n" 
                                         + question}], self._stream_callback if HAS_PYSIDE else None)
             self.messages.append({"role": "assistant", "content": response})
             
             self.refresh() # 刷新当前处理的插件和参数
-            
-            if HAS_PYSIDE and not response:
-                self.response_ready.emit(response)
-            return response
+            return True
         except Exception as e:
             error_message = f"处理消息时发生错误: {e}"
             print(error_message)
             if HAS_PYSIDE:
                 self.response_ready.emit(error_message)
-            return error_message
+            raise
 
 
 if __name__ == '__main__':

@@ -33,13 +33,13 @@
                 "name": "save_path",
                 "description": "保存检测结果的路径",
                 "required": false,
-                "default": "results/"
+                "default": "results//YOLO//Temp"
             }
         ]
     },
     "HumanPoseEstimate": {
         "is_load": true,
-        "enable": true,
+        "enable": false,
         "module_path": "plugins.YOLOPlugins",
         "class_name": "HummanPoseTrackYOLOPlugin",
         "description": "使用YOLO进行人体姿态跟踪。",
@@ -60,6 +60,18 @@
                 "description": "是否显示检测结果",
                 "required": false,
                 "default": true
+            },
+            {
+                "name": "is_save",
+                "description": "是否保存检测结果",
+                "required": false,
+                "default": "false"
+            },
+            {
+                "name": "save_path",
+                "description": "保存检测结果的路径",
+                "required": false,
+                "default": "results//YOLO//Temp"
             }
         ]
     },
