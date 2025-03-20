@@ -11,7 +11,6 @@ import objtracker
 from objdetector import Detector
 import cv2
 import time
-from TasksManager import Task
 
 
 RESULT_PATH = './results\\Track_results\\result.mp4'

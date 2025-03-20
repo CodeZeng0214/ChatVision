@@ -26,7 +26,7 @@ class Plugin:
         self.description = description
         self.parameters = parameters
         self.execute = None
-        self.result = None
+        self.results = None
         
     @classmethod
     def get_class_name(cls)->str:
@@ -87,4 +87,4 @@ class Plugin:
 
     def refresh(self):
         """刷新插件的执行结果"""
-        self.result = None
+        self.results = None

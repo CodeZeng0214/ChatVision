@@ -165,7 +165,7 @@ class ChatWidget(QWidget):
             # 发送错误信号到信息列表
             self.add_message_to_list(error_message)
     
-    def add_message_to_list(self, text, image_path="", is_user=True):
+    def add_message_to_list(self, text, image_path="", is_user=False):
             """向消息列表中添加一条消息并返回列表项"""
             message_item = MessageItem(text, image_path, is_user=is_user) # 创建消息气泡(图窗)
             list_item = QListWidgetItem(self.message_list) # 创建列表项
@@ -210,9 +210,9 @@ class ChatWidget(QWidget):
         self.show_sidebar()
         
         # 设置插件处理的结果
-        if self.chat_robot.current_plugin.result:
+        if self.chat_robot.current_plugin.results:
             try:
-                self.sidebar.set_processed_image(self.chat_robot.current_plugin.result)
+                self.sidebar.set_processed_image(self.chat_robot.current_plugin.results[0])
                 self.chat_robot.current_plugin.refresh()
             except Exception as e:
                 self.sidebar.set_processed_image(None)

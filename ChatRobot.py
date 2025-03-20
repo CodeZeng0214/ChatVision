@@ -57,8 +57,6 @@ class ChatRobot(QObject):
         self.current_plugin_params = None  # 当前处理的插件参数
         self.waiting_for_params = False  # 是否等待参数
 
-
-    # 主框架
     def refresh(self):
         """刷新当前处理的插件和参数"""
         self.current_plugin = None
@@ -170,6 +168,7 @@ class ChatRobot(QObject):
                 self._analyse_messages.append[{"role": "user", "content": f"These are the questions you need to answer in the format:\n{template}\n"
                                                + f"The following is the message returned after the last processing failure：{plugin_info}"
                                                + f"\nError message: {error_message}"}]
+                plugin_info = None
                 continue
         return plugin_info
     
@@ -177,7 +176,8 @@ class ChatRobot(QObject):
         """处理流式内容的回调函数"""
         if HAS_PYSIDE:
             self.stream_content.emit(content)
-            
+    
+    # 主框架
     def ChatFrame(self, question):
         """
         主处理逻辑：从用户输入到插件结果返回。\n

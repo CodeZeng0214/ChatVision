@@ -6,7 +6,7 @@ import os
 ### ========== 全局参数 ========== ###
 DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类插件的权重路径
 POSE_WEI_PATH = ".//weights//YOLO11//yolo11s-pose.pt" # 默认的人体姿态估计类插件的权重路径
-RESULT_PATH = ".//results//YOLO" # 默认的检测结果保存路径
+RESULT_PATH = ".//results//YOLO//Temp" # 默认的检测结果保存路径
 
 
 ### ========== 具体实现 ========== ###
@@ -27,6 +27,7 @@ class ObjDetectYOLOPlugin(Plugin):
                           {'name': 'is_save', 'description': '是否保存检测结果', 'required': False, 'default': False},
                           {'name': 'save_path', 'description': '检测结果的保存路径', 'required': False, 'default': RESULT_PATH}])
         self.execute = self.objDetect
+        self.results:list[str] = [] # 存储检测结果的路径
     
     # 图像物体识别（YOLO）
     def objDetect(self, params):
@@ -44,23 +45,24 @@ class ObjDetectYOLOPlugin(Plugin):
         image_path = params['image_path']
         weight_path = params.get('weight_path', DET_WEI_PATH)
         is_show = params.get('is_show', False)
-        is_save = params.get('is_save', False) or is_show
+        is_save = params.get('is_save', True)
         result_path = params.get('result_path', RESULT_PATH)
 
         # 加载 YOLO 模型
         model = YOLO(weight_path)
         print("正在使用'YOLO'进行物体检测")
         results = model.predict(source=image_path, 
-                                save=is_save, save_txt=True, save_conf=True, project=result_path,  
+                                save=is_save,save_txt=True, save_conf=True, project=result_path,  
                                 verbose=False, line_width=2)
         
         print("检测完成")
-        if is_show: self.result = results[0].path
-
+    
         # 格式化结果
-        detection_results = ['检测到以下对象：']
+        detection_results = [f'在{image_path}上检测到以下对象：']
         for result in results:
             # result是一个检测结果对象，通常包含边界框、标签、置信度等信息
+            file_name = os.path.basename(image_path)
+            self.results.append(f'{result.save_dir}\\{file_name}')
             detection_result = ''
             for box in result.boxes:  # 访问每个检测的框
             # 提取边界框坐标、置信度和标签
