@@ -2,6 +2,7 @@
 
 from core.Plugin import Plugin
 import os
+from core.AuxiliaryFunction import get_all_image_paths
 
 ### ========== 全局参数 ========== ###
 DET_WEI_PATH = './/weights//YOLO_World//yolov8s-worldv2.pt' # 默认的图像检测类插件的权重路径
@@ -42,6 +43,8 @@ class ObjDetectYOLOPlugin(Plugin):
         """
         from ultralytics import YOLO
         
+        self.results.clear() # 清空检测结果路径
+        
         image_path = params['image_path']
         weight_path = params.get('weight_path', DET_WEI_PATH)
         is_show = params.get('is_show', False)
@@ -61,8 +64,7 @@ class ObjDetectYOLOPlugin(Plugin):
         detection_results = [f'在{image_path}上检测到以下对象：']
         for result in results:
             # result是一个检测结果对象，通常包含边界框、标签、置信度等信息
-            file_name = os.path.basename(image_path)
-            self.results.append(f'{result.save_dir}\\{file_name}')
+            self.results.extend(get_all_image_paths(result.save_dir))
             detection_result = ''
             for box in result.boxes:  # 访问每个检测的框
             # 提取边界框坐标、置信度和标签

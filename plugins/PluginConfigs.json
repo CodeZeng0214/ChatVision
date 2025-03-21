@@ -15,7 +15,7 @@
                 "name": "weight_path",
                 "description": "YOLO权重路径",
                 "required": false,
-                "default": "weights//YOLO_World//yolov8s-worldv2.pt"
+                "default": ".//weights//YOLO_World//yolov8s-worldv2.pt"
             },
             {
                 "name": "is_show",
@@ -33,7 +33,7 @@
                 "name": "save_path",
                 "description": "保存检测结果的路径",
                 "required": false,
-                "default": "results//YOLO//Temp"
+                "default": ".//results//YOLO//Temp"
             }
         ]
     },
@@ -53,7 +53,7 @@
                 "name": "weight_path",
                 "description": "YOLO权重路径，文件类型为.pt",
                 "required": false,
-                "default": "weights/yolov5s.pt"
+                "default": ".//weights/yolov5s.pt"
             },
             {
                 "name": "is_show",
@@ -71,7 +71,7 @@
                 "name": "save_path",
                 "description": "保存检测结果的路径",
                 "required": false,
-                "default": "results//YOLO//Temp"
+                "default": ".//results//YOLO//Temp"
             }
         ]
     },
@@ -91,7 +91,7 @@
                 "name": "weight_path",
                 "description": "BLIP权重路径，文件类型为.pt",
                 "required": false,
-                "default": "weights/blip.pt"
+                "default": ".//weights/blip.pt"
             }
         ]
     }

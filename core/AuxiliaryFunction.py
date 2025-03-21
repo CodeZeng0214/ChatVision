@@ -40,3 +40,22 @@ def path_check(file_path):
         os.makedirs(dir_path)
     return file_path
 
+
+def get_all_image_paths(folder_path, extensions=[".jpg", ".jpeg", ".png", ".bmp", ".tiff"]):
+    """
+    获取指定文件夹下所有图片文件的路径。
+    
+    参数:
+    - folder_path: str，文件夹路径
+    - extensions: list，支持的图片文件扩展名（默认支持常见图片格式）
+
+    返回:
+    - list，包含所有图片文件路径的列表
+    """
+    image_paths = []
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if os.path.splitext(file)[1].lower() in extensions:
+                image_paths.append(os.path.join(root, file))
+    return image_paths
+

@@ -45,12 +45,18 @@ class SidebarWidget(QWidget):
     
     def set_original_image(self, image_path):
         """设置原始图片"""
+        if not image_path:
+            self.original_image.clear()
+            return
         pixmap = QPixmap(image_path)
         scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.original_image.setPixmap(scaled_pixmap)
     
     def set_processed_image(self, image_path):
         """设置处理后图片"""
+        if not image_path:
+            self.processed_image.clear()
+            return
         pixmap = QPixmap(image_path)
         scaled_pixmap = pixmap.scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.processed_image.setPixmap(scaled_pixmap)

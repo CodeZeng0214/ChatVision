@@ -172,16 +172,14 @@ class ChatWidget(QWidget):
         # 添加用户消息到列表
         self.add_message_to_list(message_text, self.selected_file_path, is_user=True)
         
+        self.sidebar.set_original_image(None)  # 清空原始图片
         # 如果有选择文件，将文件路径添加到消息
         if self.selected_file_path:
             message_text = f"{message_text}\n[图片路径: {self.selected_file_path}]"
             # 设置原始图片到侧边栏
             self.sidebar.set_original_image(self.selected_file_path)
-        
-        # 清空输入框和文件选择
-        self.input_text.clear()
-        self.selected_file_path = ""
-        self.file_label.setText("未选择文件")
+            
+        self.refresh() # 重置状态
         
         # 添加AI思考中的消息
         self.current_response_item = self.add_message_to_list("思考中...", "", is_user=False)
@@ -230,7 +228,15 @@ class ChatWidget(QWidget):
         self.message_list.setItemWidget(self.current_response_item, new_item)
         
         self.message_list.scrollToBottom() # 滚动到底部
-
+    
+    def refresh(self):
+        """ 清空输入框和文件选择 """
+        self.input_text.clear()
+        self.selected_file_path = ""
+        self.file_label.setText("未选择文件")
+        self.param_widget.hide()  # 发送消息时隐藏参数输入区域
+        self.sidebar.close()  # 发送消息时关闭侧边栏
+    
     @Slot(str)
     def response_stream_to_widget(self, content):
         """更新流式内容到聊天窗口"""
