@@ -6,10 +6,12 @@ import importlib
 import inspect
 from typing import Dict, Callable, Any, List
 from core.Plugin import Plugin
+from core.SystemConfig import system_config
 import sys
-from core.AuxiliaryFunction import PathCheck
+from core.AuxiliaryFunction import path_check
 
-COFIG_PATH = "plugins/PluginConfigs.json" # 插件配置的默认路径
+# 从系统配置获取插件配置路径
+COFIG_PATH = system_config.get_value("plugin_manager", "plugins_config_path", "plugins/PluginConfigs.json")
 
 ### ========== 插件注册与管理 ========== ###
 class PluginManager:

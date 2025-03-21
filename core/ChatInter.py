@@ -2,12 +2,12 @@
 
 from openai import OpenAI
 from typing import Callable, Optional
+from core.SystemConfig import system_config
 
-
-### ========== 全局参数 ========== ###
-BASE_URL = "https://api.chatanywhere.tech/v1" # 默认语义大模型网站
-API_KEY = "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR" # 默认网站密钥
-GPT_MODEL = 'gpt-4o-mini' # 默认GPT模型
+### 全局参数 - 从系统配置加载
+BASE_URL = system_config.get_value("chat_interface", "api_url", "https://api.chatanywhere.tech/v1")
+API_KEY = system_config.get_value("chat_interface", "api_key", "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR")
+GPT_MODEL = system_config.get_value("chat_interface", "model_name", "gpt-4o-mini")
 
 
 ### ========== ChatGPT聊天类 ========== ###

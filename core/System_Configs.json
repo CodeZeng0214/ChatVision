@@ -1,0 +1,14 @@
+{
+    "chat_robot": {
+        "init_message": "You are a chatbot capable of image recognition ",
+        "analyze_max_attempts": 2
+    },
+    "plugin_manager": {
+        "plugins_config_path": "plugins/PluginConfigs.json"
+    },
+    "chat_interface": {
+        "api_url": "https://api.chatanywhere.tech/v1",
+        "api_key": "sk-AencKA6Oy7WnhukWgquDlbis89fhQ5q4Nz8ba4BvYJUjy8LR",
+        "model_name": "gpt-4o-mini"
+    }
+}

@@ -9,13 +9,13 @@
 from core.ChatInter import ChatGPT # 导入ChatGPT聊天接口
 from core.PluginManager import PluginManager # 导入插件管理器
 from core.Plugin import Plugin # 导入插件基类
+from core.SystemConfig import system_config # 导入系统配置
 import threading  # 导入threading模块
 from time import sleep as wait
 
-### 全局参数
-# CHAT_INTER = ChatGPT() # 聊天接口
-INIT_MESSAGE = "You are a chatbot capable of image recognition " # 初始化消息
-ATT_MAX = 3 # 尝试分析用户意图并转化成json格式的最大次数
+### 全局参数 - 从系统配置加载
+INIT_MESSAGE = system_config.get_value("chat_robot", "init_message", "You are a chatbot capable of image recognition ")
+ATT_MAX = system_config.get_value("chat_robot", "analyze_max_attempts", 3)
 
 # 条件导入PySide6，当此脚本不是启动脚本时导入
 if __name__ != '__main__':
@@ -40,17 +40,17 @@ class ChatRobot(QObject):
     stream_content = Signal(str) if HAS_PYSIDE else None  # 流式内容更新信号
 
 
-    def __init__(self, chat_inter=ChatGPT(), init_message=INIT_MESSAGE):
+    def __init__(self, chat_inter=None, init_message=None):
         """
         可选参数：\n
         -chat_inter 与语言模型通讯的聊天接口，默认为ChatGPT
-        init_message "You are a chatbot capable of image recognition " 初始化消息"
+        init_message 初始化消息，默认从系统配置加载
         """
         if HAS_PYSIDE:
             super().__init__()
         
-        self.chat_inter = chat_inter
-        self.messages = [{"role": "system", "content": init_message}]
+        self.chat_inter = chat_inter or ChatGPT()
+        self.messages = [{"role": "system", "content": init_message or INIT_MESSAGE}]
         self._analyse_messages = [] # 分析用户意图的消息流
         self.plugin_manager = PluginManager() # 实例化一个插件管理器
         self.current_plugin = None  # 当前处理的插件
@@ -188,7 +188,7 @@ class ChatRobot(QObject):
             if plugin_info == "MAX": return "error: 尝试次数超过最大值"
             
             # 如果用户输入匹配不到插件则正常调用聊天接口
-            if plugin_info == "General": 
+            if (plugin_info == "General"): 
                 if HAS_PYSIDE:
                     self.response_ready.emit("连接大模型中。。。")
                 # 使用回调函数处理流式内容

@@ -4,6 +4,8 @@ from PySide6.QtGui import QIcon
 
 from gui.ChatWidget import ChatWidget
 from gui.PluginManagerWidget import PluginManagerWidget
+from gui.SystemConfigWidget import SystemConfigWidget
+from core.SystemConfig import system_config
 
 class MainWindow(QMainWindow):
     """主窗口，包含聊天界面和插件管理界面"""
@@ -25,6 +27,11 @@ class MainWindow(QMainWindow):
         self.plugin_manager = PluginManagerWidget(self.chat_widget.chat_robot.plugin_manager)
         self.tabs.addTab(self.plugin_manager, "插件管理")
         
+        # 创建系统配置界面
+        self.system_config_widget = SystemConfigWidget()
+        self.system_config_widget.config_changed.connect(self.on_config_changed)
+        self.tabs.addTab(self.system_config_widget, "系统设置")
+        
         self.connect_signals() # 连接信号槽
         
         # 状态栏
@@ -39,3 +46,8 @@ class MainWindow(QMainWindow):
     def on_status_message(self, message):
         """状态消息槽函数"""
         self.statusBar().showMessage(message)
+        
+    @Slot()
+    def on_config_changed(self):
+        """配置变更槽函数"""
+        self.statusBar().showMessage("系统配置已更新，部分设置将在重启后生效")

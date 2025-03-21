@@ -7,7 +7,7 @@ import os
 from typing import Dict
 
 from core.PluginManager import PluginManager
-from core.AuxiliaryFunction import PathCheck
+from core.AuxiliaryFunction import path_check
 from gui.PluginListWidgetItem import PluginListWidgetItem
 
 class PluginManagerWidget(QWidget):

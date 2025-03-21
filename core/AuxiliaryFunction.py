@@ -6,7 +6,7 @@ import os
 
 
 # 提取取两个指定字符串之间的内容
-def ExtractStrBetween(start_str, end_str, text):
+def extract_str_between(start_str, end_str, text):
     """
     提取两个指定字符串之间的内容。\n
     
@@ -31,7 +31,7 @@ def ExtractStrBetween(start_str, end_str, text):
     return promatches
 
 # 如果路径不存在则自动创建
-def PathCheck(file_path):
+def path_check(file_path):
     """
     如果路径不存在则自动创建
     """
